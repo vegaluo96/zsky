@@ -192,6 +192,11 @@ nav button.on::after{content:'';position:absolute;bottom:4px;left:50%;transform:
           <input id="anniInput" type="date" style="flex:1;min-width:0;background:rgba(255,255,255,.05);border:1px solid rgba(142,168,255,.3);border-radius:12px;padding:9px 12px;color:var(--ink);outline:none">
           <button id="anniBtn" style="margin-left:8px">记下初识</button>
         </div>
+        <div class="rowbtn" style="display:flex;align-items:center;margin-top:10px">
+          <select id="myZodiac" style="flex:1;min-width:0;background:rgba(255,255,255,.05);border:1px solid rgba(142,168,255,.3);border-radius:12px;padding:9px 12px;color:var(--ink);outline:none"></select>
+          <span id="taZodiac" style="margin-left:10px;font-size:13px;color:var(--dim);white-space:nowrap"></span>
+        </div>
+        <div class="sub" id="compatText" style="margin-top:8px"></div>
       </div>
       <div class="card" id="binaryCard"><h3>💫 双星</h3><div class="sub" id="binaryText"></div>
         <div class="rowbtn" id="binaryRow" style="display:none">
@@ -484,9 +489,10 @@ function renderHeader(){
   $('#golden').classList.toggle('hidden',!(S.sky&&S.sky.golden));
   const p=$('#partner');
   if(S.sky&&S.sky.partner){p.classList.remove('hidden');
+    const zg=S.sky.partner.zodiac!=null&&window.ZODIAC?window.ZODIAC[S.sky.partner.zodiac][1]+' ':'';
     p.innerHTML=S.sky.partner.online
-      ?'<i class="dot"></i>'+esc(S.sky.partner.name)+' 正在望着星空'
-      :esc(S.sky.partner.name)+' · '+(S.sky.partner.lastActive&&Date.now()-S.sky.partner.lastActive>60000
+      ?'<i class="dot"></i>'+zg+esc(S.sky.partner.name)+' 正在望着星空'
+      :zg+esc(S.sky.partner.name)+' · '+(S.sky.partner.lastActive&&Date.now()-S.sky.partner.lastActive>60000
         ?fmtAgo(S.sky.partner.lastActive)+'前在线':'刚离开')}
   else p.classList.add('hidden');
 }
@@ -532,6 +538,21 @@ function renderChron(){
     ?'你是 <span class="biname">'+esc(me)+'</span> · Ta 是 <span class="biname">'+esc(S.sky.partner.name)+'</span>'
     :'你是 <span class="biname">'+esc(me)+'</span> · 等 Ta 加入')+anni;
   $('#anniInput').value=S.sky.anniversary||'';
+  /* 星座 */
+  const ZD=[['白羊座','♈'],['金牛座','♉'],['双子座','♊'],['巨蟹座','♋'],['狮子座','♌'],['处女座','♍'],['天秤座','♎'],['天蝎座','♏'],['射手座','♐'],['摩羯座','♑'],['水瓶座','♒'],['双鱼座','♓']];
+  window.ZODIAC=ZD;
+  const sel=$('#myZodiac');
+  if(!sel.options.length)sel.innerHTML='<option value="">点亮你的星座</option>'+ZD.map((z,i)=>'<option value="'+i+'">'+z[1]+' '+z[0]+'</option>').join('');
+  const mz=S.player&&S.player.zodiac!=null?S.player.zodiac:null;
+  sel.value=mz!=null?String(mz):'';
+  const pz=S.sky.partner&&S.sky.partner.zodiac!=null?S.sky.partner.zodiac:null;
+  $('#taZodiac').textContent=S.sky.partner?('Ta：'+(pz!=null?ZD[pz][1]+' '+ZD[pz][0]:'未设置')):'';
+  if(mz!=null&&pz!=null){
+    const s=Math.min(mz,pz)*12+Math.max(mz,pz);
+    const v=60+(s*37)%39;
+    const bl=['心意相通','天作之合','互补成双','默契十足','细水长流'][s%5];
+    $('#compatText').innerHTML=ZD[mz][1]+' '+ZD[mz][0]+' × '+ZD[pz][1]+' '+ZD[pz][0]+' · <span class="biname">默契指数 '+v+'</span> · '+bl;
+  }else $('#compatText').textContent='两人都点亮星座后，看看你们的默契指数';
   const b=S.sky.binary;
   if(b.unlocked){
     $('#binaryText').innerHTML=b.name?('你们的双星名为 <span class="biname">「'+esc(b.name)+'」</span><br>两颗星，永远绕转'):'双星已成形，为它起个名字吧';
@@ -593,6 +614,8 @@ function connectSSE(){
   es.addEventListener('rename',e=>{toast('✦ Ta 现在叫「'+JSON.parse(e.data).name+'」');refreshState()});
   es.addEventListener('cc',e=>{toast('✏️ Ta 在你们夜空画了「'+JSON.parse(e.data).name+'」');meteorShower(4);SFX.cons();refreshState()});
   es.addEventListener('anni',()=>{toast('🗓 Ta 记下了你们的初识之日');refreshState()});
+  es.addEventListener('zodiac',e=>{const d=JSON.parse(e.data);
+    toast('✦ Ta 点亮了星座 '+(window.ZODIAC?window.ZODIAC[d.zodiac][1]+' '+window.ZODIAC[d.zodiac][0]:''));refreshState()});
 }
 async function replayUnread(){
   try{
@@ -736,6 +759,12 @@ $('#renameBtn').onclick=async()=>{
 $('#anniBtn').onclick=async()=>{
   try{await api('/sky/anniversary',{date:$('#anniInput').value});
     toast('🗓 记下了，从那天起数');renderChron();refreshState();
+  }catch(e){toast(e.message)}};
+$('#myZodiac').onchange=async()=>{
+  const v=$('#myZodiac').value;if(v==='')return;
+  try{await api('/player/zodiac',{zodiac:+v});
+    if(S.player)S.player.zodiac=+v;
+    toast('✦ 星座已点亮');renderChron();refreshState();
   }catch(e){toast(e.message)}};
 $('#tlBtn').onclick=async()=>{
   try{const j=await api('/api/poke/timeline?limit=100');

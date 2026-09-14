@@ -27,6 +27,8 @@ const BINARY_LEVEL_GATE = 6; // 观星台+星座总等级 ≥6 或 第12天 解�
 const db = new Database(__dirname + '/zsky.db');
 db.pragma('journal_mode = WAL');
 try { db.exec('ALTER TABLE skies ADD COLUMN anniversary TEXT'); } catch (e) { /* 已存在 */ }
+try { db.exec('ALTER TABLE players ADD COLUMN zodiac INTEGER'); } catch (e) { /* 已存在 */ }
+const ZODIAC = [['白羊座', '♈'], ['金牛座', '♉'], ['双子座', '♊'], ['巨蟹座', '♋'], ['狮子座', '♌'], ['处女座', '♍'], ['天秤座', '♎'], ['天蝎座', '♏'], ['射手座', '♐'], ['摩羯座', '♑'], ['水瓶座', '♒'], ['双鱼座', '♓']];
 db.exec(`
 CREATE TABLE IF NOT EXISTS players (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,7 +170,7 @@ function requirePlayer(req, res) {
   if (!p) { res.status(401).json({ error: 'unauthorized' }); return null; }
   return p;
 }
-const pubPlayer = p => ({ id: p.id, name: p.name, skyId: p.sky_id || null, hasRecovery: !!p.recovery });
+const pubPlayer = p => ({ id: p.id, name: p.name, skyId: p.sky_id || null, hasRecovery: !!p.recovery, zodiac: p.zodiac ?? null });
 
 // ---- 成长与数值
 function dayIndex(sky) {
@@ -285,7 +287,7 @@ function skyOf(p) {
     gifts: { received: gifts.filter(g => !g.mine), given: gifts.filter(g => g.mine).length, total: giftCount },
     messages: { items: msgs, unread: msgs.filter(m => !m.mine && !m.opened && m.openable).length },
     daily: dailyOf(p, sky),
-    partner: partner ? { name: partner.name, online: isOnline(partner.id), lastActive: partner.last_active } : null,
+    partner: partner ? { name: partner.name, online: isOnline(partner.id), lastActive: partner.last_active, zodiac: partner.zodiac ?? null } : null,
     pokes: { mine: c.mine || 0, theirs: c.theirs || 0 },
     lastPokeId: last,
     chronicleCount: chrCount,
@@ -323,6 +325,20 @@ app.post('/api/player/rename', (req, res) => {
   const t = partnerOf(p);
   if (t) sendTo(t.id, 'rename', { name });
   res.json({ ok: true, name });
+});
+app.post('/api/player/zodiac', (req, res) => {
+  const p = requirePlayer(req, res); if (!p) return;
+  const z = req.body.zodiac;
+  if (!Number.isInteger(z) || z < 0 || z > 11) return res.status(400).json({ error: '星座参数不合法' });
+  db.prepare('UPDATE players SET zodiac=? WHERE id=?').run(z, p.id);
+  const np = P(p.id);
+  const t = partnerOf(np);
+  if (t) sendTo(t.id, 'zodiac', { zodiac: z, name: np.name });
+  if (np.sky_id && t && t.zodiac != null &&
+      !db.prepare('SELECT 1 FROM chronicle WHERE sky_id=? AND kind=?').get(np.sky_id, 'zodiac_pair')) {
+    chron(np.sky_id, 'zodiac_pair', `💫 星座合鸣：${ZODIAC[z][1]} ${ZODIAC[z][0]} × ${ZODIAC[t.zodiac][1]} ${ZODIAC[t.zodiac][0]}`);
+  }
+  res.json({ ok: true, zodiac: z });
 });
 
 // ---- 星空
