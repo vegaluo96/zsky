@@ -404,6 +404,7 @@ async function refreshState(){
 }
 setInterval(()=>{
   if(!S.sky||$('#mine').classList.contains('hidden'))return;
+  if(!stateAt)stateAt=Date.now(); // 防御：创建路径漏设基准时不误显示满额
   const r=S.sky.rate,wm=S.sky.weather.mult;
   const pend=Math.min(S.sky.pending+(Date.now()-stateAt)/3600000*r.total*wm,r.total*wm*12);
   $('#pending').textContent=Math.floor(pend);
@@ -451,13 +452,14 @@ function showSetup(){
 }
 $('#createBtn').onclick=async()=>{
   try{const j=await api('/sky/create',{name:$('#nick').value.trim()||undefined});
-    S.sky=j.sky;
+    S.sky=j.sky;stateAt=Date.now();
     $('#inviteCode').textContent=S.sky.inviteCode;
     $('#inviteLink').textContent=location.origin+'/#'+S.sky.inviteCode;
     $('#mine').classList.remove('hidden');renderMine();
     $('#setup').classList.add('hidden');$('#share').classList.remove('hidden');
     spawnMeteor(true);toast('✦ +30 星光见面礼');
     if(!window.es)connectSSE();
+    renderHeader();renderTa();
   }catch(e){$('#setupErr').textContent=e.message}};
 $('#toJoin').onclick=()=>{$('#setup').classList.add('hidden');$('#join').classList.remove('hidden');$('#joinNick').value=$('#nick').value};
 $('#joinBack').onclick=()=>{$('#join').classList.add('hidden');$('#setup').classList.remove('hidden')};
