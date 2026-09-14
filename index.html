@@ -43,7 +43,7 @@ header{position:relative;z-index:2;display:flex;align-items:center;justify-conte
 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#8be9b8;box-shadow:0 0 6px rgba(139,233,184,.9);animation:breathe 2s ease-in-out infinite;margin-right:5px;vertical-align:1px}
 #partner{color:rgba(190,235,208,.8)}
 main{position:relative;flex:1;z-index:2}
-.view{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px;padding:0 16px 20px}
+.view{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px;padding:0 16px 20px;overflow-y:auto}
 .view.hidden{display:none}
 .view.scroll{justify-content:flex-start;overflow:auto;padding:12px 16px 20px;-webkit-overflow-scrolling:touch}
 .hidden{display:none!important}
@@ -96,6 +96,8 @@ button:disabled{opacity:.35}
 .hint b{color:var(--warm)}
 #dailyText .ok{color:var(--warm);font-style:normal;font-weight:600}
 #dailyText .no{opacity:.32;font-style:normal}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px 18px}
+.dcell{display:flex;justify-content:space-between;align-items:center}
 /* 送星：两行结构 */
 #giftRow button{height:auto;padding:9px 6px;display:flex;flex-direction:column;gap:3px;align-items:center}
 #giftRow button small{font-size:11px;letter-spacing:0;color:var(--warm-dim)}
@@ -108,6 +110,9 @@ button:disabled{opacity:.35}
 #chrList div{border-bottom:1px solid rgba(255,255,255,.06);padding:5px 2px;display:flex;justify-content:space-between;gap:10px}
 #chrList .day{color:var(--ink)}
 #chrList span{opacity:.5;font-size:12px;white-space:nowrap;flex-shrink:0;margin-left:12px}
+#tlInline .tlrow{display:flex;justify-content:space-between;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.06)}
+#tlInline .tlrow span{opacity:.5;font-size:12px}
+#tlInline b{color:var(--warm);font-weight:600}
 .bottle{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--hair);
   border-radius:12px;padding:8px 12px;margin:6px 0;font-size:13px}
 .bottle .txt{color:var(--ink);line-height:1.6}
@@ -186,7 +191,6 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
         <div class="rowbtn"><input id="msgInput" maxlength="50" placeholder="写一句星语，装进瓶子（10✦）">
           <button id="msgSend">寄出</button></div>
         <div class="rowbtn">
-          <button id="tlBtn" class="ghost"><span data-ico="clock"></span>想念时间线</button>
           <button id="bottleBtn" class="ghost"><span data-ico="bottle"></span>星语瓶<span id="bottleBadge" class="badge" style="display:none"></span></button>
         </div>
       </div>
@@ -214,6 +218,10 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
         <div class="rowbtn" id="binaryRow" style="display:none">
           <input id="binaryInput" maxlength="12" placeholder="给你们的双星起个名字" style="width:60%;background:rgba(255,255,255,.06);border:1px solid rgba(142,168,255,.3);border-radius:12px;padding:9px 12px;color:var(--ink);outline:none">
           <button id="binaryBtn">命名</button></div></div>
+      <div class="card"><h3><span data-ico="heart"></span>想念时间线</h3>
+        <div id="tlInline" class="sub">…</div>
+        <div class="rowbtn"><button id="tlBtn" class="ghost">查看全部记录</button></div>
+      </div>
       <div class="card"><h3><span data-ico="clock"></span>星历</h3><div id="chrList"><div class="sub">加载中…</div></div></div>
     </section>
 
@@ -292,8 +300,16 @@ async function api(path,body){
   if(!path.startsWith('/api'))path='/api'+path; // 统一走 /api 前缀
   const opts={method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-Token':TOKEN}};
   if(body)opts.body=JSON.stringify(body);
-  const r=await fetch(path,opts);const j=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j;
+  let r;
+  try{r=await fetch(path,opts)}catch(e){throw new Error('网络开小差了，稍后再试')}
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401){ // 登录态失效（如数据重置）：清 token 重新进入
+    localStorage.removeItem('zsky_token');
+    if(!api._r){api._r=1;location.reload()}
+    throw new Error('登录态失效，正在重新进入');
+  }
+  if(!r.ok)throw new Error(j.error||('出了点问题（'+r.status+'）'));
+  return j;
 }
 
 /* ================= 星空引擎 ================= */
@@ -546,10 +562,10 @@ function renderMine(){
   const ccsN=(S.sky.customCons||[]).length;
   $('#drawBtn').innerHTML='<span class="bl">'+ico('pen')+'画星座</span><small>'+(ccsN>=3?'已满 3 / 3':(ccsN?'20 ✦ · '+ccsN+'/3':'20 ✦'))+'</small>';
   $('#drawBtn').disabled=ccsN>=3||S.sky.starlight<20;
-  /* 双人任务 */
-  const d=S.sky.daily,ck=x=>x?'<i class="ok">✓</i>':'<i class="no">✗</i>';
+  /* 双人任务：2×2 视图 */
+  const d=S.sky.daily,cell=(label,ok)=>'<div class="dcell"><span>'+label+'</span>'+(ok?'<i class="ok">✓</i>':'<i class="no">✗</i>')+'</div>';
   $('#dailyText').innerHTML=S.sky.partner
-    ?('收集 '+ck(d.me.collected)+' / 想念 '+ck(d.me.poked)+'（你）&nbsp;&nbsp;收集 '+ck(d.ta.collected)+' / 想念 '+ck(d.ta.poked)+'（Ta）')
+    ?'<div class="dgrid">'+cell('你 · 收集',d.me.collected)+cell('Ta · 收集',d.ta.collected)+cell('你 · 想念',d.me.poked)+cell('Ta · 想念',d.ta.poked)+'</div>'
     :'等 Ta 加入后一起做任务';
   $('#claimBtn').style.display=d.claimable?'':'none';
   if(d.claimed)$('#claimBtn').style.display='none';
@@ -596,11 +612,20 @@ function renderChron(){
     $('#binaryText').innerHTML='两颗绕转的星将在夜空成形<br>总等级 <span class="biname">'+lv+' / 6</span>（观星台+星座，用星光点亮即可）';
     $('#binaryRow').style.display='none';
   }
-  api('/api/chronicle?limit=80').then(j=>{
-    $('#chrList').innerHTML=j.items.length
-      ?j.items.map(i=>'<div'+(i.text.startsWith('第')?' class="day"':'')+'>'+esc(i.text)+'<span style="float:right;opacity:.5">'+fmtTime(i.created_at)+'</span></div>').join('')
-      :'<div class="sub">故事从今天开始</div>';
-  }).catch(()=>{});
+  const chronVisible=!$('#chron').classList.contains('hidden');
+  if(chronVisible||!renderChron._at||Date.now()-renderChron._at>15000){
+    renderChron._at=Date.now();
+    api('/api/chronicle?limit=80').then(j=>{
+      $('#chrList').innerHTML=j.items.length
+        ?j.items.map(i=>'<div'+(i.text.startsWith('第')?' class="day"':'')+'>'+esc(i.text)+'<span>'+fmtTime(i.created_at)+'</span></div>').join('')
+        :'<div class="sub">故事从今天开始</div>';
+    }).catch(()=>{});
+    api('/api/poke/timeline?limit=6').then(j=>{
+      $('#tlInline').innerHTML=j.items.length
+        ?j.items.map(i=>'<div class="tlrow">'+(i.mine?'你 → Ta':'<b>Ta → 你</b>')+'<span>'+fmtTime(i.at)+'</span></div>').join('')
+        :'还没有想念记录，去戳一戳吧';
+    }).catch(()=>{});
+  }
 }
 function enterSky(){
   $('#setup').classList.add('hidden');$('#share').classList.add('hidden');
@@ -839,6 +864,7 @@ $('#bottles').addEventListener('click',e=>{if(e.target===$('#bottles'))$('#bottl
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   ['mine','ta','chron'].forEach(v=>$('#'+v).classList.toggle('hidden',b.dataset.view!==v));
+  if(b.dataset.view==='chron')renderChron(); // 打开「我们」页时刷新记录
 });
 
 /* ================= 启动 ================= */

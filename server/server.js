@@ -491,10 +491,6 @@ app.post('/api/gift', (req, res) => {
   const t = partnerOf(p);
   if (t) sendTo(t.id, 'gift', { id: r.lastInsertRowid, type, x, y, name: p.name });
 });
-app.get('/api/gifts', (req, res) => {
-  const p = requirePlayer(req, res); if (!p) return;
-  res.json({ sky: skyOf(p) ? { gifts: skyOf(p).gifts } : null });
-});
 
 // ---- 星语瓶
 app.post('/api/message', (req, res) => {
