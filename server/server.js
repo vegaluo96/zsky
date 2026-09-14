@@ -12,8 +12,6 @@ const BANK_HOURS = 3;        // 星光最多囤 3 小时
 const WELCOME_GIFT = 30;     // 创建见面礼
 const PARTNER_ACTIVE_H = 48; // 伴侣 48h 内活跃 → +30%
 const DAILY_REWARD = 4;      // 双人任务奖励
-const GIFT_COST = [4, 10, 24];     // 小星/亮星/彩星
-const GIFT_NAMES = ['小星', '亮星', '彩星'];
 const MSG_COST = 2;          // 星语瓶
 const MSG_DELAY_H = 6;       // 星语瓶 6 小时后才能开启
 const CUSTOM_COST = 4;       // 画一座自定义星座
@@ -550,28 +548,6 @@ app.post('/api/ticket/redeem', (req, res) => {
   if (t.to_player !== p.id) return res.status(403).json({ error: '只有心愿主人能兑现' });
   if (!t.redeemed) db.prepare('UPDATE tickets SET redeemed=1 WHERE id=?').run(t.id);
   res.json({ ok: true });
-});
-
-// ---- 摘星送 Ta
-app.post('/api/gift', (req, res) => {
-  const p = requirePlayer(req, res); if (!p) return;
-  const sky = p.sky_id && db.prepare('SELECT * FROM skies WHERE id=?').get(p.sky_id);
-  if (!sky) return res.status(400).json({ error: '还没有星空' });
-  const type = [0, 1, 2].includes(req.body.type) ? req.body.type : 0;
-  const cost = GIFT_COST[type];
-  if (sky.starlight < cost) return res.status(400).json({ error: `星光不足，${GIFT_NAMES[type]}需要 ${cost}` });
-  const x = +(0.06 + Math.random() * 0.88).toFixed(3), y = +(0.06 + Math.random() * 0.6).toFixed(3);
-  db.prepare('UPDATE skies SET starlight=starlight-? WHERE id=?').run(cost, sky.id);
-  const r = db.prepare('INSERT INTO gifts(sky_id,from_player,type,x,y,created_at) VALUES(?,?,?,?,?,?)')
-    .run(sky.id, p.id, type, x, y, now());
-  const total = db.prepare('SELECT COUNT(*) c FROM gifts WHERE sky_id=?').get(sky.id).c;
-  if (total === 1) chron(sky.id, 'gift:1', `💫 第一颗星被摘下，送给了 Ta`);
-  if (total === 10) chron(sky.id, 'gift:10', `💫 第十颗星！Ta 的夜空渐渐璀璨`);
-  if (total === 50) chron(sky.id, 'gift:50', `💫 第五十颗星，银河为证`);
-  markDaily(p.id, 'poked'); // 送星也算今日互动
-  res.json({ ok: true, id: r.lastInsertRowid, type, x, y, cost, starlight: sky.starlight - cost });
-  const t = partnerOf(p);
-  if (t) sendTo(t.id, 'gift', { id: r.lastInsertRowid, type, x, y, name: p.name });
 });
 
 // ---- 星语瓶
