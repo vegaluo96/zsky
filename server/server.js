@@ -26,6 +26,7 @@ const BINARY_LEVEL_GATE = 6; // 观星台+星座总等级 ≥6 或 第12天 解�
 
 const db = new Database(__dirname + '/zsky.db');
 db.pragma('journal_mode = WAL');
+try { db.exec('ALTER TABLE skies ADD COLUMN anniversary TEXT'); } catch (e) { /* 已存在 */ }
 db.exec(`
 CREATE TABLE IF NOT EXISTS players (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,7 +171,15 @@ function requirePlayer(req, res) {
 const pubPlayer = p => ({ id: p.id, name: p.name, skyId: p.sky_id || null, hasRecovery: !!p.recovery });
 
 // ---- 成长与数值
-const dayIndex = sky => Math.floor((now() - sky.created_at) / 86400e3) + 1;
+function dayIndex(sky) {
+  if (sky.anniversary) { // 初识日期按自然日计（北京时间）
+    const d1 = new Date(sky.anniversary + 'T00:00:00+08:00');
+    const d2 = new Date(dayKey() + 'T00:00:00+08:00');
+    return Math.max(1, Math.round((d2 - d1) / 86400e3) + 1);
+  }
+  return Math.floor((now() - sky.created_at) / 86400e3) + 1;
+}
+const milestoneOf = day => (day === 100 || day === 520 || day === 1000 || (day > 0 && day % 365 === 0)) ? day : null;
 function consGateOf(sky, count) {
   const d = dayIndex(sky);
   if (count >= 2 && d < 4) return '第 4 天起可继续点亮';
@@ -224,6 +233,11 @@ function skyOf(p) {
   const sky = db.prepare('SELECT * FROM skies WHERE id=?').get(p.sky_id);
   if (!sky) return null;
   const partner = partnerOf(p);
+  const day = dayIndex(sky);
+  const milestone = milestoneOf(day);
+  if (milestone && !db.prepare('SELECT 1 FROM chronicle WHERE sky_id=? AND kind=?').get(sky.id, 'milestone:' + milestone)) {
+    chron(sky.id, 'milestone:' + milestone, `🎉 在一起第 ${milestone} 天——从初识到今夜，星光作证`);
+  }
   ensureDayEntry(p, sky);
   const c = db.prepare(`SELECT
     SUM(CASE WHEN from_player=? THEN 1 ELSE 0 END) AS mine,
@@ -261,7 +275,9 @@ function skyOf(p) {
     rate: r,
     weather: weatherOf(),
     golden: goldenNow(),
-    day: dayIndex(sky),
+    day,
+    milestone,
+    anniversary: sky.anniversary || null,
     observatory: { level: sky.obs_level, nextCost: OBS_COST(sky.obs_level), bonus: r.obs },
     constellations: { count: sky.const_count, names: CONS_NAMES.slice(0, sky.const_count), next: consNext },
     customCons,
@@ -422,6 +438,25 @@ app.post('/api/cons/custom', (req, res) => {
   res.json({ ok: true, id: r.lastInsertRowid, cost: CUSTOM_COST, starlight: sky.starlight - CUSTOM_COST });
   const t = partnerOf(p);
   if (t) sendTo(t.id, 'cc', { name, stars });
+});
+
+// ---- 初识日期
+app.post('/api/sky/anniversary', (req, res) => {
+  const p = requirePlayer(req, res); if (!p) return;
+  const sky = p.sky_id && db.prepare('SELECT * FROM skies WHERE id=?').get(p.sky_id);
+  if (!sky) return res.status(400).json({ error: '还没有星空' });
+  const d = String(req.body.date || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return res.status(400).json({ error: '日期格式应为 YYYY-MM-DD' });
+  const t = new Date(d + 'T00:00:00+08:00');
+  if (isNaN(t.getTime())) return res.status(400).json({ error: '日期不合法' });
+  if (t.getTime() > now()) return res.status(400).json({ error: '初识之日还不能是未来' });
+  const first = !sky.anniversary;
+  db.prepare('UPDATE skies SET anniversary=? WHERE id=?').run(d, sky.id);
+  if (first) chron(sky.id, 'anni', `🗓 你们的故事始于 ${d}，往后的每一天都有星光`);
+  else chron(sky.id, 'anni_chg', `🗓 初识日期改为了 ${d}`);
+  const tp = partnerOf(p);
+  if (tp) sendTo(tp.id, 'anni', { date: d });
+  res.json({ ok: true, date: d });
 });
 
 // ---- 摘星送 Ta

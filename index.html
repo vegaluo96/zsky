@@ -8,6 +8,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
+  color-scheme:dark;
   --ink:#eef1ff;--dim:rgba(238,241,255,.58);--faint:rgba(238,241,255,.36);
   --warm:#ffd9a0;--warm-dim:rgba(255,217,160,.6);
   --hair:rgba(255,255,255,.10);--hair-strong:rgba(255,255,255,.17);
@@ -180,8 +181,12 @@ nav button.on::after{content:'';position:absolute;bottom:4px;left:50%;transform:
       <div class="card"><h3>👤 我们</h3>
         <div class="sub" id="usText"></div>
         <div class="rowbtn" style="display:flex;align-items:center">
-          <input id="renameInput" maxlength="12" placeholder="你的新昵称" style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(142,168,255,.3);border-radius:12px;padding:9px 12px;color:var(--ink);outline:none">
+          <input id="renameInput" maxlength="12" placeholder="你的新昵称" style="flex:1;min-width:0;background:rgba(255,255,255,.05);border:1px solid rgba(142,168,255,.3);border-radius:12px;padding:9px 12px;color:var(--ink);outline:none">
           <button id="renameBtn" style="margin-left:8px">改名</button>
+        </div>
+        <div class="rowbtn" style="display:flex;align-items:center;margin-top:10px">
+          <input id="anniInput" type="date" style="flex:1;min-width:0;background:rgba(255,255,255,.05);border:1px solid rgba(142,168,255,.3);border-radius:12px;padding:9px 12px;color:var(--ink);outline:none">
+          <button id="anniBtn" style="margin-left:8px">记下初识</button>
         </div>
       </div>
       <div class="card" id="binaryCard"><h3>💫 双星</h3><div class="sub" id="binaryText"></div>
@@ -481,9 +486,11 @@ function renderTa(){
 function renderChron(){
   $('#chrDay').textContent='💫 在一起第 '+S.sky.day+' 天';
   const me=S.player&&S.player.name?S.player.name:'你';
-  $('#usText').innerHTML=S.sky.partner
-    ?('你是 <span class="biname">'+esc(me)+'</span> · Ta 是 <span class="biname">'+esc(S.sky.partner.name)+'</span>')
-    :('你是 <span class="biname">'+esc(me)+'</span> · 等 Ta 加入');
+  const anni=S.sky.anniversary?(' · 初识于 '+S.sky.anniversary+'，相伴 '+S.sky.day+' 天'):'';
+  $('#usText').innerHTML=(S.sky.partner
+    ?'你是 <span class="biname">'+esc(me)+'</span> · Ta 是 <span class="biname">'+esc(S.sky.partner.name)+'</span>'
+    :'你是 <span class="biname">'+esc(me)+'</span> · 等 Ta 加入')+anni;
+  $('#anniInput').value=S.sky.anniversary||'';
   const b=S.sky.binary;
   if(b.unlocked){
     $('#binaryText').innerHTML=b.name?('你们的双星名为 <span class="biname">「'+esc(b.name)+'」</span><br>两颗星，永远绕转'):'双星已成形，为它起个名字吧';
@@ -504,6 +511,11 @@ function enterSky(){
   $('#setup').classList.add('hidden');$('#share').classList.add('hidden');
   $('#mine').classList.remove('hidden');
   stateAt=Date.now();renderHeader();renderMine();renderTa();renderChron();
+  if(S.sky.milestone&&!sessionStorage.getItem('zsky_ms'+S.sky.milestone)){
+    sessionStorage.setItem('zsky_ms'+S.sky.milestone,'1');
+    setTimeout(()=>{meteorShower(8);vibrate(40);
+      toast('🎉 今天是在一起第 '+S.sky.day+' 天，星光作证')},1600);
+  }
   if(!window.es)connectSSE();
 }
 async function refreshState(){
@@ -539,6 +551,7 @@ function connectSSE(){
   es.addEventListener('partner_offline',()=>{if(S.sky&&S.sky.partner){S.sky.partner.online=false;renderHeader()}});
   es.addEventListener('rename',e=>{toast('✦ Ta 现在叫「'+JSON.parse(e.data).name+'」');refreshState()});
   es.addEventListener('cc',e=>{toast('✏️ Ta 在你们夜空画了「'+JSON.parse(e.data).name+'」');meteorShower(4);refreshState()});
+  es.addEventListener('anni',()=>{toast('🗓 Ta 记下了你们的初识之日');refreshState()});
 }
 async function replayUnread(){
   try{
@@ -677,6 +690,10 @@ $('#renameBtn').onclick=async()=>{
   try{const j=await api('/player/rename',{name:$('#renameInput').value.trim()});
     if(S.player)S.player.name=j.name;
     $('#renameInput').value='';toast('✦ 已改名为「'+j.name+'」');renderChron();refreshState();
+  }catch(e){toast(e.message)}};
+$('#anniBtn').onclick=async()=>{
+  try{await api('/sky/anniversary',{date:$('#anniInput').value});
+    toast('🗓 记下了，从那天起数');renderChron();refreshState();
   }catch(e){toast(e.message)}};
 $('#tlBtn').onclick=async()=>{
   try{const j=await api('/api/poke/timeline?limit=100');
