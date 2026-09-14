@@ -427,17 +427,22 @@ function frame(t){
     const y=-40+(d.y*H*0.72+40)*ease(d.t);
     glowStar(d.x*W,y,GIFT_STYLE[d.type].r+1,GIFT_STYLE[d.type].c,GIFT_STYLE[d.type].g,1);
   }
-  /* 双星 */
-  if(S.sky&&S.sky.binary&&S.sky.binary.name){
-    const cx2=W*.5-px*14,cy2=H*.17-py*12,R=24,a0=clock/900;
+  /* 双星：解锁后成形；命名后亮起并显示名字 */
+  if(S.sky&&S.sky.binary&&S.sky.binary.unlocked){
+    const named=!!S.sky.binary.name,cx2=W*.5-px*14,cy2=H*.17-py*12,R=24,a0=clock/900;
     for(let k=0;k<2;k++){
       const a=a0+k*Math.PI,x=cx2+Math.cos(a)*R,y=cy2+Math.sin(a)*R*.5;
-      glowStar(x,y,3.2,k?'#ffd9a0':'#9db4ff',k?'rgba(255,205,130,.9)':'rgba(160,185,255,.9)',.9);
+      glowStar(x,y,3.2,k?'#ffd9a0':'#9db4ff',k?'rgba(255,205,130,.9)':'rgba(160,185,255,.9)',named?.9:.35);
     }
-    ctx.strokeStyle='rgba(255,217,160,.18)';ctx.beginPath();ctx.ellipse(cx2,cy2,R,R*.5,0,0,7);ctx.stroke();
+    ctx.strokeStyle='rgba(255,217,160,'+(named?.18:.08)+')';ctx.beginPath();ctx.ellipse(cx2,cy2,R,R*.5,0,0,7);ctx.stroke();
     ctx.font='12px system-ui';ctx.textAlign='center';
-    ctx.fillStyle='rgba(255,217,160,.85)';ctx.shadowColor='rgba(255,217,160,.8)';ctx.shadowBlur=8;
-    ctx.fillText('「 '+S.sky.binary.name+' 」',cx2,cy2+R+18);ctx.shadowBlur=0;
+    if(named){
+      ctx.fillStyle='rgba(255,225,176,.85)';ctx.shadowColor='rgba(255,217,160,.8)';ctx.shadowBlur=8;
+      ctx.fillText('「 '+S.sky.binary.name+' 」',cx2,cy2+R+18);ctx.shadowBlur=0;
+    }else{
+      ctx.fillStyle='rgba(238,241,255,.35)';
+      ctx.fillText('双星 · 待命名',cx2,cy2+R+18);
+    }
   }
   /* 流星宝宝（第 8 天起） */
   if(S.sky&&S.sky.day>=8){
@@ -605,6 +610,15 @@ function enterSky(){
     sessionStorage.setItem('zsky_ms'+S.sky.milestone,'1');
     setTimeout(()=>{meteorShower(8);vibrate(40);SFX.gift();
       toast('🎉 今天是在一起第 '+S.sky.day+' 天，星光作证')},1600);
+  }
+  /* 新成员首现自我介绍（各只一次） */
+  if(S.sky.day>=8&&!localStorage.getItem('zsky_seen_pet')){
+    localStorage.setItem('zsky_seen_pet','1');
+    setTimeout(()=>toast('🌟 流星宝宝来你们的夜空安家了，它会四处闲逛'),2600);
+  }
+  if(S.sky.binary&&S.sky.binary.unlocked&&!localStorage.getItem('zsky_seen_bin')){
+    localStorage.setItem('zsky_seen_bin','1');
+    setTimeout(()=>toast('💫 双星成形了——在「我们」页为它起名字'),3400);
   }
   if(!window.es)connectSSE();
 }
