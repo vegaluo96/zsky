@@ -6,7 +6,8 @@
 <meta name="theme-color" content="#0b1026">
 <title>摘星 · 为你摘星</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;scrollbar-width:none;-ms-overflow-style:none}
+::-webkit-scrollbar{display:none;width:0;height:0}
 :root{
   color-scheme:dark;
   --ink:#eef1ff;--dim:rgba(238,241,255,.58);--faint:rgba(238,241,255,.36);
@@ -106,7 +107,7 @@ button:disabled{opacity:.35}
 #tlList b{color:var(--warm);font-weight:600}
 #chrList div{border-bottom:1px solid rgba(255,255,255,.06);padding:5px 2px;display:flex;justify-content:space-between;gap:10px}
 #chrList .day{color:var(--ink)}
-#chrList span{opacity:.5;font-size:12px;white-space:nowrap}
+#chrList span{opacity:.5;font-size:12px;white-space:nowrap;flex-shrink:0;margin-left:12px}
 .bottle{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--hair);
   border-radius:12px;padding:8px 12px;margin:6px 0;font-size:13px}
 .bottle .txt{color:var(--ink);line-height:1.6}
