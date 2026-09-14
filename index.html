@@ -32,6 +32,9 @@ body{font-family:system-ui,-apple-system,"PingFang SC","HarmonyOS Sans SC",sans-
   radial-gradient(100% 70% at 20% -10%,rgba(30,40,90,.6),transparent 55%),
   linear-gradient(180deg,var(--bg1),var(--bg2) 75%,#241a4d)}
 header{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:12px 18px 4px}
+.iconbtn{height:32px;width:32px;padding:0;font-size:15px;border:none;background:none;box-shadow:none;backdrop-filter:none;color:var(--dim)}
+.iconbtn:active{transform:scale(.9);background:none}
+#soundBtn{margin-right:10px}
 .brand{font-weight:600;letter-spacing:5px;font-size:14px}
 #status{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:12px}
 #golden{color:var(--warm-dim)}
@@ -131,6 +134,7 @@ nav button.on::after{content:'';position:absolute;bottom:4px;left:50%;transform:
   <header>
     <div class="brand">摘星</div>
     <div id="status">
+      <button id="soundBtn" class="iconbtn" title="音效">🔊</button>
       <span id="dayBadge"></span>
       <span id="weather"></span>
       <span id="golden" class="hidden">黄金×2</span>
@@ -424,6 +428,43 @@ function frame(t){
   requestAnimationFrame(frame);
 }
 const vibrate=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+/* ---- 音效引擎：Web Audio 现场合成，零音频文件 ---- */
+let AC=null,soundOn=localStorage.getItem('zsky_sound')!=='0';
+function ac(){
+  if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==='suspended')AC.resume();
+  return AC;
+}
+document.addEventListener('pointerdown',()=>{if(soundOn)try{ac()}catch(e){}},{once:true});
+function tone(freq,dur,type,vol,when,slideTo){
+  if(!soundOn)return;
+  try{
+    const a=ac(),t=a.currentTime+(when||0);
+    const o=a.createOscillator(),g=a.createGain();
+    o.type=type||'sine';
+    o.frequency.setValueAtTime(freq,t);
+    if(slideTo)o.frequency.exponentialRampToValueAtTime(slideTo,t+dur);
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vol||.12,t+.012);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g).connect(a.destination);
+    o.start(t);o.stop(t+dur+.05);
+  }catch(e){}
+}
+const SFX={
+  pokeSend:()=>tone(600,.35,'sine',.11,0,1400),                                  // 流星飞出：上扬滑音
+  pokeRecv:()=>{tone(880,.5,'sine',.13);tone(1318,.6,'sine',.07,.12)},           // 被想念：双音风铃
+  collect:()=>[523,659,784].forEach((f,i)=>tone(f,.25,'triangle',.09,i*.08)),    // 收集：上行琶音
+  gift:()=>[659,880,1109,1319].forEach((f,i)=>tone(f,.4,'sine',.08,i*.09)),      // 星光闪亮
+  cons:()=>{tone(440,.8,'sine',.09,0,880);[880,1109,1319].forEach((f,i)=>tone(f,.5,'sine',.06,.3+i*.12))}, // 星座升起
+  msg:()=>tone(760,.4,'sine',.08,0,480),                                         // 星语瓶漂出：下滑音
+};
+function renderSound(){$('#soundBtn').textContent=soundOn?'🔊':'🔇'}
+$('#soundBtn').onclick=()=>{
+  soundOn=!soundOn;localStorage.setItem('zsky_sound',soundOn?'1':'0');
+  renderSound();if(soundOn){try{ac()}catch(e){};SFX.pokeRecv()}
+  toast(soundOn?'🔊 音效已开':'🔇 音效已关');
+};
 function shake(){const a=$('#app');a.classList.remove('shake');void a.offsetWidth;a.classList.add('shake')}
 let toastTimer;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');
@@ -513,7 +554,7 @@ function enterSky(){
   stateAt=Date.now();renderHeader();renderMine();renderTa();renderChron();
   if(S.sky.milestone&&!sessionStorage.getItem('zsky_ms'+S.sky.milestone)){
     sessionStorage.setItem('zsky_ms'+S.sky.milestone,'1');
-    setTimeout(()=>{meteorShower(8);vibrate(40);
+    setTimeout(()=>{meteorShower(8);vibrate(40);SFX.gift();
       toast('🎉 今天是在一起第 '+S.sky.day+' 天，星光作证')},1600);
   }
   if(!window.es)connectSSE();
@@ -535,11 +576,11 @@ function connectSSE(){
   const es=new EventSource('/api/events?token='+encodeURIComponent(TOKEN));
   window.es=es;
   es.addEventListener('poke',e=>{const d=JSON.parse(e.data);
-    spawnMeteor(false);shake();vibrate(40);
+    spawnMeteor(false);shake();vibrate(40);SFX.pokeRecv();
     toast('💫 '+(d.name||'Ta')+' 正在想你');
     if(d.id)localStorage.setItem('zsky_lastpoke',d.id);refreshState();});
   es.addEventListener('gift',e=>{const d=JSON.parse(e.data);
-    drops.push({x:d.x,y:d.y,type:d.type,t:0});vibrate(30);
+    drops.push({x:d.x,y:d.y,type:d.type,t:0});vibrate(30);SFX.gift();
     toast('✨ '+(d.name||'Ta')+' 摘了一颗星送你');refreshState();});
   es.addEventListener('message',()=>{toast('🍾 一只星语瓶正漂向你的夜空');refreshState();});
   es.addEventListener('binary',e=>{const d=JSON.parse(e.data);
@@ -550,7 +591,7 @@ function connectSSE(){
     toast('✦ Ta 来了');});
   es.addEventListener('partner_offline',()=>{if(S.sky&&S.sky.partner){S.sky.partner.online=false;renderHeader()}});
   es.addEventListener('rename',e=>{toast('✦ Ta 现在叫「'+JSON.parse(e.data).name+'」');refreshState()});
-  es.addEventListener('cc',e=>{toast('✏️ Ta 在你们夜空画了「'+JSON.parse(e.data).name+'」');meteorShower(4);refreshState()});
+  es.addEventListener('cc',e=>{toast('✏️ Ta 在你们夜空画了「'+JSON.parse(e.data).name+'」');meteorShower(4);SFX.cons();refreshState()});
   es.addEventListener('anni',()=>{toast('🗓 Ta 记下了你们的初识之日');refreshState()});
 }
 async function replayUnread(){
@@ -612,12 +653,13 @@ $('#collect').onclick=async()=>{
   try{const j=await api('/sky/collect',{});
     S.sky.starlight=j.starlight;S.sky.pending=0;stateAt=Date.now();
     renderMine();vibrate(15);
+    if(j.gained>0)SFX.collect();
     toast(j.gained>0?('✦ +'+j.gained+' 星光'+(j.golden?' · 黄金时刻×2！':'')):'星光还在路上，等等 Ta');
     for(let i=0;i<4;i++)setTimeout(()=>spawnMeteor(false),i*260);
     refreshState();
   }catch(e){toast(e.message)}};
 $('#pokeBtn').onclick=async()=>{
-  spawnMeteor(true);vibrate(20);
+  spawnMeteor(true);vibrate(20);SFX.pokeSend();
   try{await api('/poke',{});S.sky.pokes.mine++;renderTa();refreshState()}
   catch(e){toast(e.message)}};
 $('#obsBtn').onclick=async()=>{
@@ -626,7 +668,7 @@ $('#obsBtn').onclick=async()=>{
   }catch(e){toast(e.message)}};
 $('#consBtn').onclick=async()=>{
   try{const j=await api('/sky/constellation',{});
-    toast('✦ 点亮了'+j.name);meteorShower(5);vibrate(30);refreshState();
+    toast('✦ 点亮了'+j.name);meteorShower(5);vibrate(30);SFX.cons();refreshState();
   }catch(e){toast(e.message)}};
 /* ---- 画星座模式 ---- */
 let drawing=false,drawStars=[];
@@ -667,24 +709,24 @@ $('#ccOk').onclick=async()=>{
   try{
     await api('/cons/custom',{name:$('#ccName').value.trim(),stars:drawStars});
     toast('✏️ 「'+$('#ccName').value.trim()+'」升起了，全世界仅此一座');
-    meteorShower(5);vibrate(30);exitDraw();refreshState();
+    meteorShower(5);vibrate(30);SFX.cons();exitDraw();refreshState();
   }catch(e){$('#ccErr').textContent=e.message}
 };
 document.querySelectorAll('#giftRow button').forEach(b=>b.onclick=async()=>{
-  try{await api('/gift',{type:+b.dataset.gift});
+  try{SFX.pokeSend();await api('/gift',{type:+b.dataset.gift});
     spawnMeteor(true);toast('✨ 星已摘下，飞向 Ta 的夜空');refreshState();
   }catch(e){toast(e.message)}});
 $('#msgSend').onclick=async()=>{
   try{await api('/message',{text:$('#msgInput').value});
-    $('#msgInput').value='';toast('🍾 星语瓶已漂出，6 小时后 Ta 才能开瓶');refreshState();
+    $('#msgInput').value='';SFX.msg();toast('🍾 星语瓶已漂出，6 小时后 Ta 才能开瓶');refreshState();
   }catch(e){toast(e.message)}};
 $('#msgInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('#msgSend').click()});
 $('#claimBtn').onclick=async()=>{
-  try{await api('/daily/claim',{});toast('✦ 双人任务奖励 +20！');meteorShower(4);refreshState();
+  try{await api('/daily/claim',{});toast('✦ 双人任务奖励 +20！');meteorShower(4);SFX.gift();refreshState();
   }catch(e){toast(e.message)}};
 $('#binaryBtn').onclick=async()=>{
   try{await api('/binary/name',{name:$('#binaryInput').value.trim()});
-    toast('💫 双星有了名字');refreshState();
+    toast('💫 双星有了名字');SFX.cons();refreshState();
   }catch(e){toast(e.message)}};
 $('#renameBtn').onclick=async()=>{
   try{const j=await api('/player/rename',{name:$('#renameInput').value.trim()});
@@ -718,7 +760,7 @@ $('#bottleBtn').onclick=()=>{
   document.querySelectorAll('#bottleList [data-open]').forEach(b=>b.onclick=async()=>{
     try{const j=await api('/message/open',{id:+b.dataset.open});
       b.parentElement.innerHTML='<span class="txt">🍾 '+esc(j.text)+'</span><span style="opacity:.5">已开启</span>';
-      toast('✉️ '+j.text);spawnMeteor(false);refreshState();
+      toast('✉️ '+j.text);spawnMeteor(false);SFX.gift();refreshState();
     }catch(e){toast(e.message)}});
 };
 $('#bottleClose').onclick=()=>$('#bottles').classList.add('hidden');
@@ -739,6 +781,7 @@ async function boot(){
   }catch(e){toast('连接星空失败，请刷新重试')}
   await wait;
   $('#load').classList.add('off');$('#app').classList.remove('hidden');
+  renderSound();
   if(S.sky){
     enterSky();replayUnread();
     const last=+(localStorage.getItem('zsky_visit')||0);
