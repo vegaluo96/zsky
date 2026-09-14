@@ -396,7 +396,8 @@ function renderHeader(){
   if(S.sky&&S.sky.partner){p.classList.remove('hidden');
     p.innerHTML=S.sky.partner.online
       ?'<i class="dot"></i>'+esc(S.sky.partner.name)+' 正在望着星空'
-      :esc(S.sky.partner.name)+' · '+fmtAgo(S.sky.partner.lastActive||Date.now())+'前在线'}
+      :esc(S.sky.partner.name)+' · '+(S.sky.partner.lastActive&&Date.now()-S.sky.partner.lastActive>60000
+        ?fmtAgo(S.sky.partner.lastActive)+'前在线':'刚离开')}
   else p.classList.add('hidden');
 }
 function renderMine(){
