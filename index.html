@@ -128,9 +128,12 @@ nav button.on{background:rgba(255,255,255,.08);color:var(--ink)}
 .ico{width:15px;height:15px;vertical-align:-3px;margin-right:5px;opacity:.85}
 .navico{width:20px;height:20px;margin:0 auto 3px;display:block}
 nav button{flex-direction:column;height:44px;font-size:11px;letter-spacing:2px;padding:0}
-#mine .rowbtn button,#giftRow button{height:auto;padding:8px 6px;display:flex;flex-direction:column;gap:3px;align-items:center;font-size:13px;line-height:1.35}
-#mine .rowbtn button small,#giftRow button small{font-size:11px;letter-spacing:0;color:var(--warm-dim)}
-#mine .rowbtn button .ico,#giftRow button .ico{margin-right:0;width:16px;height:16px}
+#mine .rowbtn button,#giftRow button{height:auto;padding:9px 6px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;font-size:13px;line-height:1.3}
+#mine .rowbtn button small,#giftRow button small{font-size:11px;letter-spacing:0;color:var(--warm-dim);white-space:nowrap}
+#mine .rowbtn button .bl,#giftRow button .bl{display:flex;align-items:center;gap:5px}
+#mine .rowbtn button .ico{width:14px;height:14px;flex:0 0 auto}
+.gdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
+#pending{font-variant-numeric:tabular-nums}
 nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
   width:4px;height:4px;border-radius:50%;background:var(--warm)}
 .daybadge{font-size:12px;color:var(--warm-dim);letter-spacing:3px;margin-bottom:10px;align-self:center}
@@ -176,9 +179,9 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
       <div class="hint" id="pokeHint"></div>
       <div class="panel">
         <div class="rowbtn" id="giftRow">
-          <button data-gift="0">小星<small>20 ✦</small></button>
-          <button data-gift="1">亮星<small>50 ✦</small></button>
-          <button data-gift="2">彩星<small>120 ✦</small></button>
+          <button data-gift="0"><span class="bl"><i class="gdot" style="background:#eef2ff;box-shadow:0 0 6px rgba(238,242,255,.9)"></i>小星</span><small>20 ✦</small></button>
+          <button data-gift="1"><span class="bl"><i class="gdot" style="background:#ffd9a0;box-shadow:0 0 6px rgba(255,217,160,.9)"></i>亮星</span><small>50 ✦</small></button>
+          <button data-gift="2"><span class="bl"><i class="gdot" style="background:#9ff0e2;box-shadow:0 0 6px rgba(159,240,226,.9)"></i>彩星</span><small>120 ✦</small></button>
         </div>
         <div class="rowbtn"><input id="msgInput" maxlength="50" placeholder="写一句星语，装进瓶子（10✦）">
           <button id="msgSend">寄出</button></div>
@@ -529,14 +532,14 @@ function renderMine(){
   if(r.partnerActive)parts.push('Ta同行+30%');
   $('#rateHint').innerHTML='✦ '+r.total.toFixed(1)+'/小时 · '+parts.join(' · ')+'<br>第 '+S.sky.day+' 天 · 离线封顶 12 小时';
   const ob=S.sky.observatory;
-  $('#obsBtn').innerHTML=ico('tele')+'观星台 Lv'+(ob.level+1)+'<small>'+ob.nextCost+' ✦</small>';
+  $('#obsBtn').innerHTML='<span class="bl">'+ico('tele')+'观星台</span><small>Lv'+ob.level+' → '+(ob.level+1)+' · '+ob.nextCost+' ✦</small>';
   $('#obsBtn').disabled=S.sky.starlight<ob.nextCost;
   const cn=S.sky.constellations.next;
-  if(cn)$('#consBtn').innerHTML=ico('cons')+cn.name+'<small>'+(cn.locked?cn.locked:cn.cost+' ✦')+'</small>';
-  else $('#consBtn').innerHTML=ico('cons')+'全部点亮';
+  if(cn)$('#consBtn').innerHTML='<span class="bl">'+ico('cons')+cn.name+'</span><small>'+(cn.locked?cn.locked:cn.cost+' ✦')+'</small>';
+  else $('#consBtn').innerHTML='<span class="bl">'+ico('cons')+'星座</span><small>全部点亮</small>';
   $('#consBtn').disabled=!cn||S.sky.starlight<cn.cost||!!(cn&&cn.locked);
   const ccsN=(S.sky.customCons||[]).length;
-  $('#drawBtn').innerHTML=ico('pen')+'画星座'+'<small>'+(ccsN>=3?'3 / 3 已满':'20 ✦')+'</small>';
+  $('#drawBtn').innerHTML='<span class="bl">'+ico('pen')+'画星座</span><small>'+(ccsN>=3?'已满 3 / 3':(ccsN?'20 ✦ · '+ccsN+'/3':'20 ✦'))+'</small>';
   $('#drawBtn').disabled=ccsN>=3||S.sky.starlight<20;
   /* 双人任务 */
   const d=S.sky.daily,ck=x=>x?'<i class="ok">✓</i>':'<i class="no">✗</i>';
