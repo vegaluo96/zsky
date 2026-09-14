@@ -444,8 +444,8 @@ function frame(t){
       ctx.fillText('双星 · 待命名',cx2,cy2+R+18);
     }
   }
-  /* 流星宝宝（第 8 天起） */
-  if(S.sky&&S.sky.day>=8){
+  /* 流星宝宝：常驻小家伙，在夜空闲逛 */
+  if(S.sky){
     const bx=W*(.5+.36*Math.sin(clock/9000)),by=H*(.42+.2*Math.sin(clock/6800+1.3));
     glowStar(bx,by,3.4+Math.sin(clock/300)*.5,'#fff0c8','rgba(255,235,180,.9)',.9);
     ctx.font='10px system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(255,240,200,.5)';
@@ -593,7 +593,7 @@ function renderChron(){
     if(b.name)$('#binaryInput').placeholder='换个名字（可随时改）';
   }else{
     const lv=S.sky.observatory.level-1+S.sky.constellations.count;
-    $('#binaryText').innerHTML='两颗绕转的星将在夜空成形<br>总等级 <span class="biname">'+lv+' / 6</span>（观星台+星座）或第 12 天解锁';
+    $('#binaryText').innerHTML='两颗绕转的星将在夜空成形<br>总等级 <span class="biname">'+lv+' / 6</span>（观星台+星座，用星光点亮即可）';
     $('#binaryRow').style.display='none';
   }
   api('/api/chronicle?limit=80').then(j=>{
@@ -612,7 +612,7 @@ function enterSky(){
       toast('🎉 今天是在一起第 '+S.sky.day+' 天，星光作证')},1600);
   }
   /* 新成员首现自我介绍（各只一次） */
-  if(S.sky.day>=8&&!localStorage.getItem('zsky_seen_pet')){
+  if(!localStorage.getItem('zsky_seen_pet')){
     localStorage.setItem('zsky_seen_pet','1');
     setTimeout(()=>toast('🌟 流星宝宝来你们的夜空安家了，它会四处闲逛'),2600);
   }

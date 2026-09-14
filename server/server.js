@@ -182,12 +182,7 @@ function dayIndex(sky) {
   return Math.floor((now() - sky.created_at) / 86400e3) + 1;
 }
 const milestoneOf = day => (day === 100 || day === 520 || day === 1000 || (day > 0 && day % 365 === 0)) ? day : null;
-function consGateOf(sky, count) {
-  const d = dayIndex(sky);
-  if (count >= 2 && d < 4) return '第 4 天起可继续点亮';
-  if (count >= 4 && d < 8) return '第 8 天起可继续点亮';
-  return null;
-}
+const consGateOf = (sky, count) => null; // 星座无日期门控，星光即门票
 function rateOf(sky, partner) {
   const obs = (sky.obs_level - 1) * OBS_BONUS;
   const cons = sky.const_count * CONS_BONUS;
@@ -200,7 +195,7 @@ function pendingOf(sky, partner) {
   const r = rateOf(sky, partner);
   return Math.floor(hours * r.total * weatherOf().mult);
 }
-const binaryUnlocked = sky => sky.obs_level - 1 + sky.const_count >= BINARY_LEVEL_GATE || dayIndex(sky) >= 12;
+const binaryUnlocked = sky => sky.obs_level - 1 + sky.const_count >= BINARY_LEVEL_GATE;
 
 // ---- 星历
 function chron(skyId, kind, text) {
@@ -417,7 +412,7 @@ app.post('/api/binary/name', (req, res) => {
   const p = requirePlayer(req, res); if (!p) return;
   const sky = p.sky_id && db.prepare('SELECT * FROM skies WHERE id=?').get(p.sky_id);
   if (!sky) return res.status(400).json({ error: '还没有星空' });
-  if (!binaryUnlocked(sky)) return res.status(400).json({ error: '双星尚未成形（总等级 6 或第 12 天解锁）' });
+  if (!binaryUnlocked(sky)) return res.status(400).json({ error: '双星尚未成形（观星台+星座总等级 6 解锁）' });
   const name = String(req.body.name || '').trim().slice(0, 12);
   if (!name) return res.status(400).json({ error: '名字不能为空' });
   const first = !sky.binary_name;
