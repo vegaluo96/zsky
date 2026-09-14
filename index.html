@@ -345,7 +345,7 @@ function renderHeader(){
 function renderMine(){
   $('#balance').textContent=S.sky.starlight;
   const r=S.sky.rate;
-  const parts=['基础'+BASE(r)];if(r.obs)parts.push('观星台+'+r.obs);if(r.cons)parts.push('星座+'+r.cons);
+  const parts=['基础'+(r.base-r.obs-r.cons)];if(r.obs)parts.push('观星台+'+r.obs);if(r.cons)parts.push('星座+'+r.cons);
   if(r.partnerActive)parts.push('Ta同行+30%');
   $('#rateHint').innerHTML='✦ '+r.total.toFixed(1)+'/小时 · '+parts.join(' · ')+'<br>第 '+S.sky.day+' 天 · 离线封顶 12 小时';
   const ob=S.sky.observatory;
@@ -364,7 +364,6 @@ function renderMine(){
   if(d.claimed)$('#claimBtn').style.display='none';
   giftStars=S.sky.gifts.received.map(g=>({x:g.x,y:g.y,type:g.type}));
 }
-const BASE=r=>r.base;
 function renderTa(){
   const p=S.sky.pokes;
   $('#pokeHint').innerHTML=S.sky.partner
