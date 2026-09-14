@@ -284,6 +284,15 @@ app.post('/api/player/restore', (req, res) => {
   if (!p) return res.status(404).json({ error: '找回码不存在' });
   res.json({ token: p.token, player: pubPlayer(p), sky: skyOf(p) });
 });
+app.post('/api/player/rename', (req, res) => {
+  const p = requirePlayer(req, res); if (!p) return;
+  const name = String(req.body.name || '').trim().slice(0, 12);
+  if (!name) return res.status(400).json({ error: '名字不能为空' });
+  db.prepare('UPDATE players SET name=? WHERE id=?').run(name, p.id);
+  const t = partnerOf(p);
+  if (t) sendTo(t.id, 'rename', { name });
+  res.json({ ok: true, name });
+});
 
 // ---- 星空
 app.post('/api/sky/create', (req, res) => {

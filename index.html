@@ -128,6 +128,13 @@ nav button.on{background:rgba(142,168,255,.16);border-color:rgba(142,168,255,.55
 
     <section id="chron" class="view scroll hidden">
       <div class="daybadge" id="chrDay"></div>
+      <div class="card"><h3>👤 我们</h3>
+        <div class="sub" id="usText"></div>
+        <div class="rowbtn" style="display:flex;align-items:center">
+          <input id="renameInput" maxlength="12" placeholder="你的新昵称" style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(142,168,255,.3);border-radius:12px;padding:9px 12px;color:var(--ink);outline:none">
+          <button id="renameBtn" style="margin-left:8px">改名</button>
+        </div>
+      </div>
       <div class="card" id="binaryCard"><h3>💫 双星</h3><div class="sub" id="binaryText"></div>
         <div class="rowbtn" id="binaryRow" style="display:none">
           <input id="binaryInput" maxlength="12" placeholder="给你们的双星起个名字" style="width:60%;background:rgba(255,255,255,.06);border:1px solid rgba(142,168,255,.3);border-radius:12px;padding:9px 12px;color:var(--ink);outline:none">
@@ -375,6 +382,10 @@ function renderTa(){
 }
 function renderChron(){
   $('#chrDay').textContent='💫 在一起第 '+S.sky.day+' 天';
+  const me=S.player&&S.player.name?S.player.name:'你';
+  $('#usText').innerHTML=S.sky.partner
+    ?('你是 <span class="biname">'+esc(me)+'</span> · Ta 是 <span class="biname">'+esc(S.sky.partner.name)+'</span>')
+    :('你是 <span class="biname">'+esc(me)+'</span> · 等 Ta 加入');
   const b=S.sky.binary;
   if(b.unlocked){
     $('#binaryText').innerHTML=b.name?('你们的双星名为 <span class="biname">「'+esc(b.name)+'」</span><br>两颗星，永远绕转'):'双星已成形，为它起个名字吧';
@@ -428,6 +439,7 @@ function connectSSE(){
     if(S.sky){S.sky.partner=S.sky.partner||{};if(d&&d.name)S.sky.partner.name=d.name;S.sky.partner.online=true;renderHeader()}
     toast('✦ Ta 来了');});
   es.addEventListener('partner_offline',()=>{if(S.sky&&S.sky.partner){S.sky.partner.online=false;renderHeader()}});
+  es.addEventListener('rename',e=>{toast('✦ Ta 现在叫「'+JSON.parse(e.data).name+'」');refreshState()});
 }
 async function replayUnread(){
   try{
@@ -519,6 +531,11 @@ $('#claimBtn').onclick=async()=>{
 $('#binaryBtn').onclick=async()=>{
   try{await api('/binary/name',{name:$('#binaryInput').value.trim()});
     toast('💫 双星有了名字');refreshState();
+  }catch(e){toast(e.message)}};
+$('#renameBtn').onclick=async()=>{
+  try{const j=await api('/player/rename',{name:$('#renameInput').value.trim()});
+    if(S.player)S.player.name=j.name;
+    $('#renameInput').value='';toast('✦ 已改名为「'+j.name+'」');renderChron();refreshState();
   }catch(e){toast(e.message)}};
 $('#tlBtn').onclick=async()=>{
   try{const j=await api('/api/poke/timeline?limit=100');
