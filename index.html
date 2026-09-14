@@ -113,6 +113,23 @@ button:disabled{opacity:.35}
 #tlInline .tlrow span{opacity:.5;font-size:12px}
 #tlInline b{color:var(--warm);font-weight:600}
 #wishEdit input{margin:5px 0;padding:9px 14px;font-size:14px}
+/* 心愿单权重行 */
+.wrow{display:flex;gap:6px;align-items:center;margin:5px 0}
+.wtxt{flex:1;min-width:0;background:rgba(255,255,255,.05);border:1px solid var(--hair);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:14px;outline:none}
+.wtxt:focus{border-color:rgba(255,217,160,.35)}
+.ww{width:48px;text-align:center;background:rgba(255,255,255,.05);border:1px solid var(--hair);border-radius:10px;padding:9px 0;color:var(--warm);font-size:14px;outline:none;-moz-appearance:textfield}
+.ww::-webkit-inner-spin-button,.ww::-webkit-outer-spin-button{-webkit-appearance:none}
+.wpct{width:42px;font-size:11px;color:var(--warm-dim);text-align:right;font-variant-numeric:tabular-nums}
+/* 心愿老虎机 */
+#reelWrap{position:relative;width:100%;margin:10px 0 4px;overflow:hidden;border-radius:14px;
+  border:1px solid var(--hair);background:rgba(5,8,22,.65)}
+#reelWin{height:132px;overflow:hidden}
+#reelList{will-change:transform}
+.ritem{height:44px;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--dim);white-space:nowrap}
+.reel-line{position:absolute;left:8%;right:8%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,217,160,.55),transparent);pointer-events:none}
+.reel-line.top{top:44px}.reel-line.bot{bottom:44px}
+#reelWrap.land{animation:pulse .5s ease 2;border-color:rgba(255,217,160,.5);box-shadow:0 0 30px rgba(255,217,160,.25)}
 .bottle{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--hair);
   border-radius:12px;padding:8px 12px;margin:6px 0;font-size:13px}
 .bottle .txt{color:var(--ink);line-height:1.6}
@@ -189,7 +206,7 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
       <button id="pokeBtn" class="big warm"><span data-ico="heart"></span>想 Ta 了</button>
       <div class="hint" id="pokeHint"></div>
       <div class="panel">
-        <button id="wishDraw" class="big warm">为 Ta 抽心愿 · 1 ✦</button>
+        <button id="wishDraw" class="big warm">心愿老虎机 · 1 ✦</button>
         <div class="rowbtn"><input id="msgInput" maxlength="50" placeholder="写一句星语，装进瓶子（2✦）">
           <button id="msgSend">寄出</button></div>
         <div class="rowbtn">
@@ -272,13 +289,8 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
     </div></div>
     <div id="wishEdit" class="overlay hidden"><div class="card center">
       <h2>我的心愿单</h2>
-      <div class="sub">Ta 抽中的就是你的心愿——写真实想要的，见面兑现</div>
-      <input class="witem" maxlength="16" placeholder="心愿 1（如：一顿火锅）">
-      <input class="witem" maxlength="16" placeholder="心愿 2">
-      <input class="witem wextra" maxlength="16" placeholder="心愿 3">
-      <input class="witem wextra" maxlength="16" placeholder="心愿 4">
-      <input class="witem wextra" maxlength="16" placeholder="心愿 5">
-      <input class="witem wextra" maxlength="16" placeholder="心愿 6">
+      <div class="sub">每项可设权重 1-10，权重越高越容易被 Ta 抽中<br>抽中的心愿要兑现哦</div>
+      <div id="wishRows"></div>
       <button id="wishMore" class="ghost" style="height:30px">＋ 展开更多心愿位</button>
       <div class="err" id="wishErr"></div>
       <div class="rowbtn"><button id="wishSave" class="big warm">保存心愿单</button>
@@ -290,12 +302,19 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
       <div id="tkList"></div>
       <button id="tkClose" class="ghost" style="margin-top:14px">回到星空</button>
     </div></div>
-    <div id="drawResult" class="overlay hidden"><div class="card center">
-      <h2>🎁 抽中了心愿</h2>
-      <div class="code" id="drawPrize" style="font-size:26px;letter-spacing:4px;text-indent:4px"></div>
-      <div class="sub" id="drawSub"></div>
-      <div class="rowbtn"><button id="drawAgain" class="warm">再抽一次 · 1 ✦</button>
-        <button id="drawOk" class="ghost" style="margin:0">收下</button></div>
+    <div id="slot" class="overlay hidden"><div class="card center">
+      <h2>心愿老虎机</h2>
+      <div class="sub" id="slotSub">奖池来自 Ta 的心愿单</div>
+      <div id="reelWrap">
+        <div id="reelWin"><div id="reelList"></div></div>
+        <div class="reel-line top"></div><div class="reel-line bot"></div>
+      </div>
+      <div class="hint" id="slotOdds"></div>
+      <div class="rowbtn"><button id="slotSpin" class="big warm">抽一次 · 1 ✦</button></div>
+      <div class="rowbtn">
+        <button id="slotWish" class="ghost"><span data-ico="pen"></span>编辑我的心愿单</button>
+        <button id="slotClose" class="ghost">关闭</button>
+      </div>
     </div></div>
     <div id="drawBar" class="hidden"><div class="panel">
       <div class="hint" id="drawHint">点亮夜空：点击放置星星（3-8 颗），依次连线</div>
@@ -544,6 +563,7 @@ const SFX={
   gift:()=>[659,880,1109,1319].forEach((f,i)=>tone(f,.4,'sine',.08,i*.09)),      // 星光闪亮
   cons:()=>{tone(440,.8,'sine',.09,0,880);[880,1109,1319].forEach((f,i)=>tone(f,.5,'sine',.06,.3+i*.12))}, // 星座升起
   msg:()=>tone(760,.4,'sine',.08,0,480),                                         // 星语瓶漂出：下滑音
+  tick:()=>tone(1600,.035,'square',.035),                                        // 老虎机滚过一格
 };
 function renderSound(){$('#soundBtn').innerHTML=ico(soundOn?'sound':'mute')}
 $('#soundBtn').onclick=()=>{
@@ -918,43 +938,105 @@ $('#inviteBtn').onclick=()=>{
   $('#inviteCode').textContent=S.sky.inviteCode;
   $('#inviteLink').textContent=location.origin+'/#'+S.sky.inviteCode;
   $('#share').classList.remove('hidden');};
-/* ---- 心愿单 / 抽奖 / 心愿券 ---- */
-async function doDraw(){
-  try{const j=await api('/draw',{});
-    meteorShower(3);vibrate(30);SFX.gift();
-    $('#drawPrize').textContent=j.prize;
-    $('#drawSub').textContent=(j.pool==='default')
-      ?((S.sky.partner?S.sky.partner.name:'Ta')+' 还没写心愿单——先抽中了默认心愿，去提醒 Ta 写下真实想要的')
-      :('这是 '+(S.sky.partner?S.sky.partner.name:'Ta')+' 写下的心愿——由你来实现');
-    S.sky.starlight=j.starlight;renderMine();renderHeader();
-    $('#drawResult').classList.remove('hidden');
-  }catch(e){
-    $('#drawSub').textContent='✦ '+e.message+'（右上角余额，去星空页收集）'; // 留在弹窗内引导，不丢上下文
-  }
+/* ---- 心愿单 / 心愿老虎机 / 心愿券 ---- */
+let slotPool=null,spinning=false;
+function openSlot(){
+  $('#slot').classList.remove('hidden');
+  const pn=S.sky&&S.sky.partner?S.sky.partner.name:'Ta';
+  $('#slotSub').textContent='奖池来自 '+pn+' 的心愿单';
+  api('/api/wishlist').then(j=>{
+    slotPool=(j.theirs&&j.theirs.length)?j.theirs:(j.defaults||[]);
+    const rl=$('#reelList');
+    rl.style.transition='none';rl.style.transform='translateY(44px)';
+    let html='';
+    for(let c=0;c<9;c++)for(const it of slotPool)html+='<div class="ritem">'+esc(it.t)+'</div>';
+    rl.innerHTML=html;
+    const total=slotPool.reduce((s,x)=>s+x.w,0);
+    $('#slotOdds').textContent='奖池 '+slotPool.length+' 项 · 权重合计 '+total+' · 赔率由 '+pn+' 设定';
+  }).catch(e=>toast(e.message));
 }
-$('#wishDraw').onclick=doDraw;
-$('#drawAgain').onclick=doDraw;
-$('#drawOk').onclick=()=>$('#drawResult').classList.add('hidden');
-$('#drawResult').addEventListener('click',e=>{if(e.target===$('#drawResult'))$('#drawResult').classList.add('hidden')});
+function runReel(pool,targetIdx,done){
+  const IH=44,rl=$('#reelList'),cycle=pool.length;
+  rl.style.transition='none';rl.style.transform='translateY(44px)';void rl.offsetHeight;
+  const nT=cycle*7+targetIdx,tyEnd=44-IH*nT;
+  let lastN=-1;
+  const tickLoop=()=>{
+    if(!rl._spin)return;
+    const m=new DOMMatrix(getComputedStyle(rl).transform);
+    const n=Math.round((44-m.m42)/IH);
+    if(n!==lastN){lastN=n;SFX.tick()}
+    requestAnimationFrame(tickLoop);
+  };
+  rl._spin=true;requestAnimationFrame(tickLoop);
+  requestAnimationFrame(()=>{rl.style.transition='transform 2.4s cubic-bezier(.12,.8,.22,1)';
+    rl.style.transform='translateY('+tyEnd+'px)'});
+  setTimeout(()=>{rl._spin=false;
+    $('#reelWrap').classList.add('land');
+    setTimeout(()=>$('#reelWrap').classList.remove('land'),1000);
+    done()},2550);
+}
+$('#wishDraw').onclick=openSlot;
+$('#slotClose').onclick=()=>$('#slot').classList.add('hidden');
+$('#slot').addEventListener('click',e=>{if(e.target===$('#slot'))$('#slot').classList.add('hidden')});
+$('#slotWish').onclick=()=>{$('#slot').classList.add('hidden');$('#wishBtn').click()};
+$('#slotSpin').onclick=async()=>{
+  if(spinning)return;
+  if(!slotPool||!slotPool.length){toast('奖池为空');return}
+  spinning=true;$('#slotSpin').disabled=true;
+  try{
+    const j=await api('/draw',{});
+    const idx=Math.max(0,slotPool.findIndex(x=>x.t===j.prize));
+    runReel(slotPool,idx,()=>{
+      spinning=false;$('#slotSpin').disabled=false;
+      $('#slotSub').textContent=(j.pool==='default')
+        ?('抽中默认心愿——提醒 '+(S.sky.partner?S.sky.partner.name:'Ta')+' 写下真实心愿单')
+        :('「'+j.prize+'」——由你来实现，记得兑现');
+      meteorShower(3);vibrate(40);SFX.gift();
+      S.sky.starlight=j.starlight;renderMine();renderHeader();
+    });
+  }catch(e){spinning=false;$('#slotSpin').disabled=false;
+    $('#slotSub').textContent='✦ '+e.message;}
+};
+function wishRowHtml(i){
+  return '<div class="wrow"><input class="wtxt" maxlength="16" placeholder="心愿 '+(i+1)+(i===0?'（如：一顿火锅）':'')+'">'+
+    '<input class="ww" type="number" min="1" max="10" value="1" inputmode="numeric">'+
+    '<span class="wpct">--</span></div>';
+}
+function recalcPct(){
+  const rows=[...document.querySelectorAll('#wishRows .wrow')];
+  const ws=rows.map(r=>Math.min(10,Math.max(1,+r.querySelector('.ww').value||1)));
+  const sum=ws.reduce((a,b)=>a+b,0)||1;
+  rows.forEach((r,i)=>{r.querySelector('.wpct').textContent=Math.round(ws[i]/sum*100)+'%'});
+}
+$('#wishRows').addEventListener('input',recalcPct);
 $('#wishBtn').onclick=async()=>{
-  try{const j=await api('/api/wishlist');
-    const inputs=[...document.querySelectorAll('#wishEdit input')];
-    inputs.forEach((inp,i)=>{inp.value=j.mine[i]||''});
-    const extras=inputs.slice(2);
-    const hasExtra=extras.some(i=>i.value);
-    extras.forEach(i=>i.style.display=hasExtra?'':'none');
+  try{
+    const j=await api('/api/wishlist');
+    if(!$('#wishRows').children.length)$('#wishRows').innerHTML=Array.from({length:6},(_,i)=>wishRowHtml(i)).join('');
+    const mine=j.mine||[];
+    const rows=[...document.querySelectorAll('#wishRows .wrow')];
+    rows.forEach((r,i)=>{
+      r.querySelector('.wtxt').value=mine[i]?mine[i].t:'';
+      r.querySelector('.ww').value=mine[i]?mine[i].w:1;
+    });
+    const hasExtra=rows.slice(2).some(r=>r.querySelector('.wtxt').value);
+    rows.slice(2).forEach(r=>r.style.display=hasExtra?'':'none');
     $('#wishMore').style.display=hasExtra?'none':'';
-    $('#wishErr').textContent='';$('#wishEdit').classList.remove('hidden');
+    recalcPct();$('#wishErr').textContent='';$('#wishEdit').classList.remove('hidden');
   }catch(e){toast(e.message)}};
 $('#wishMore').onclick=()=>{
-  document.querySelectorAll('#wishEdit .wextra').forEach(i=>i.style.display='');
-  $('#wishMore').style.display='none';};
+  document.querySelectorAll('#wishRows .wrow').forEach((r,i)=>{if(i>=2)r.style.display=''});
+  $('#wishMore').style.display='none'};
 $('#wishClose').onclick=()=>$('#wishEdit').classList.add('hidden');
 $('#wishEdit').addEventListener('click',e=>{if(e.target===$('#wishEdit'))$('#wishEdit').classList.add('hidden')});
 $('#wishSave').onclick=async()=>{
-  const items=[...document.querySelectorAll('#wishEdit input')].map(i=>i.value.trim()).filter(Boolean);
+  const items=[...document.querySelectorAll('#wishRows .wrow')]
+    .map(r=>({t:r.querySelector('.wtxt').value.trim(),
+      w:Math.min(10,Math.max(1,+r.querySelector('.ww').value||1))}))
+    .filter(x=>x.t);
   try{await api('/wishlist',{items});
-    toast('✦ 心愿单已保存——Ta 抽中就要兑现哦');$('#wishEdit').classList.add('hidden');
+    toast('✦ 心愿单已保存——权重越高越容易被抽中');
+    $('#wishEdit').classList.add('hidden');
   }catch(e){$('#wishErr').textContent=e.message}};
 $('#ticketBtn').onclick=async()=>{
   try{const j=await api('/api/tickets');

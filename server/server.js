@@ -493,22 +493,30 @@ app.post('/api/sky/anniversary', (req, res) => {
   res.json({ ok: true, date: d });
 });
 
-// ---- 心愿单与抽奖：礼物由对方设定
+// ---- 心愿单与抽奖：礼物由对方设定，每项可配权重（1-10）
+function normWish(arr) {
+  return (Array.isArray(arr) ? arr : [])
+    .map(x => typeof x === 'string'
+      ? { t: x.slice(0, 16), w: 1 }
+      : { t: String(x.t || '').slice(0, 16), w: Math.min(10, Math.max(1, Math.round(Number(x.w) || 1))) })
+    .filter(x => x.t).slice(0, WISH_MAX);
+}
+const readWish = pid => {
+  const row = db.prepare('SELECT items FROM wishlists WHERE player_id=?').get(pid);
+  return row ? normWish(JSON.parse(row.items)) : [];
+};
 app.get('/api/wishlist', (req, res) => {
   const p = requirePlayer(req, res); if (!p) return;
-  const mine = db.prepare('SELECT items FROM wishlists WHERE player_id=?').get(p.id);
   const t = partnerOf(p);
-  const theirs = t ? db.prepare('SELECT items FROM wishlists WHERE player_id=?').get(t.id) : null;
   res.json({
-    mine: mine ? JSON.parse(mine.items) : [],
-    theirs: theirs ? JSON.parse(theirs.items) : null,
-    defaults: DEFAULT_WISH,
+    mine: readWish(p.id),
+    theirs: t ? readWish(t.id) : null,
+    defaults: DEFAULT_WISH.map(s => ({ t: s, w: 1 })),
   });
 });
 app.post('/api/wishlist', (req, res) => {
   const p = requirePlayer(req, res); if (!p) return;
-  const items = (Array.isArray(req.body.items) ? req.body.items : [])
-    .slice(0, WISH_MAX).map(s => String(s || '').trim().slice(0, 16)).filter(Boolean);
+  const items = normWish(req.body.items);
   const json = JSON.stringify(items);
   db.prepare('INSERT INTO wishlists(player_id,items) VALUES(?,?) ON CONFLICT(player_id) DO UPDATE SET items=?')
     .run(p.id, json, json);
@@ -521,10 +529,11 @@ app.post('/api/draw', (req, res) => {
   const t = partnerOf(p);
   if (!t) return res.status(400).json({ error: '等 Ta 加入后就能为 Ta 抽心愿' });
   if (sky.starlight < DRAW_COST) return res.status(400).json({ error: '星光不足，先去收集' });
-  const wl = db.prepare('SELECT items FROM wishlists WHERE player_id=?').get(t.id);
-  const parsed = wl ? JSON.parse(wl.items) : [];
-  const pool = parsed.length ? parsed : DEFAULT_WISH;
-  const prize = pool[Math.floor(Math.random() * pool.length)];
+  const custom = readWish(t.id);
+  const pool = custom.length ? custom : DEFAULT_WISH.map(s => ({ t: s, w: 1 }));
+  const total = pool.reduce((s, x) => s + x.w, 0);
+  let r = Math.random() * total, prize = pool[pool.length - 1].t;
+  for (const item of pool) { r -= item.w; if (r <= 0) { prize = item.t; break } }
   db.prepare('UPDATE skies SET starlight=starlight-? WHERE id=?').run(DRAW_COST, sky.id);
   db.prepare('INSERT INTO tickets(sky_id,prize,from_player,to_player,created_at) VALUES(?,?,?,?,?)')
     .run(sky.id, prize, p.id, t.id, now());
@@ -532,7 +541,7 @@ app.post('/api/draw', (req, res) => {
     chron(sky.id, 'wish:' + prize, `🎁 心愿「${prize}」第一次被抽中，记得兑现`);
   }
   markDaily(p.id, 'poked'); // 抽心愿也算今日互动
-  res.json({ ok: true, prize, pool: parsed.length ? 'custom' : 'default', starlight: sky.starlight - DRAW_COST });
+  res.json({ ok: true, prize, pool: custom.length ? 'custom' : 'default', starlight: sky.starlight - DRAW_COST });
   sendTo(t.id, 'prize', { prize, name: p.name });
 });
 app.get('/api/tickets', (req, res) => {
