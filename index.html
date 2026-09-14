@@ -40,6 +40,9 @@ main{position:relative;flex:1;z-index:2}
 .view{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px;padding:0 16px 20px}
 .view.hidden{display:none}
 .view.scroll{justify-content:flex-start;overflow:auto;padding:12px 16px 20px;-webkit-overflow-scrolling:touch}
+.hidden{display:none!important}
+#drawBar{position:absolute;bottom:0;left:0;right:0;z-index:4;display:flex;justify-content:center;padding:0 16px 16px}
+#drawBar .panel{gap:8px;padding:12px 14px}
 /* 面板与卡片：同一套玻璃语言 */
 .panel,.card{width:100%;max-width:420px;background:var(--glass);border:1px solid var(--hair);
   border-radius:var(--r-card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
@@ -143,6 +146,7 @@ nav button.on::after{content:'';position:absolute;bottom:4px;left:50%;transform:
         <div class="rowbtn">
           <button id="obsBtn">升级观星台</button>
           <button id="consBtn">点亮星座</button>
+          <button id="drawBtn">画星座 · 20✦</button>
         </div>
         <div class="hint" id="rateHint"></div>
       </div>
@@ -227,6 +231,22 @@ nav button.on::after{content:'';position:absolute;bottom:4px;left:50%;transform:
       <h2>星语瓶</h2><div class="sub">星语要漂 6 小时才能开瓶——好的东西值得等</div>
       <div id="bottleList"></div>
       <button id="bottleClose" class="ghost" style="margin-top:14px">回到星空</button>
+    </div></div>
+    <div id="drawBar" class="hidden"><div class="panel">
+      <div class="hint" id="drawHint">点亮夜空：点击放置星星（3-8 颗），依次连线</div>
+      <div class="rowbtn">
+        <button id="drawUndo" class="ghost">撤销</button>
+        <button id="drawDone" class="warm">完成并命名</button>
+        <button id="drawQuit" class="ghost">退出</button>
+      </div>
+    </div></div>
+    <div id="nameCons" class="overlay hidden"><div class="card center">
+      <h2>为这座星座命名</h2>
+      <div class="sub">它将以金色的光永远升起在你们共有的夜空（-20 ✦）</div>
+      <input id="ccName" maxlength="12" placeholder="例如：初遇座">
+      <div class="err" id="ccErr"></div>
+      <div class="rowbtn"><button id="ccOk" class="big warm">升起它</button>
+        <button id="ccBack" class="ghost" style="margin:0">返回</button></div>
     </div></div>
     <div id="toast"></div>
   </main>
@@ -328,6 +348,30 @@ function frame(t){
       ctx.lineTo(ox+C.pts[b][0]*C.s,oy+C.pts[b][1]*C.s);ctx.stroke()}
     C.pts.forEach((p,i)=>glowStar(ox+p[0]*C.s,oy+p[1]*C.s,1.6,'#dfe8ff','rgba(190,205,255,.8)',.5+.5*Math.abs(Math.sin(clock/900+i))));
   }
+  /* 自定义星座：金色的光，钉在亲手放置的原位 */
+  const ccs=(S.sky&&S.sky.customCons)||[];
+  for(const cc of ccs){
+    ctx.strokeStyle='rgba(255,217,160,.4)';ctx.lineWidth=1.2;
+    for(let i=0;i<cc.stars.length-1;i++){ctx.beginPath();
+      ctx.moveTo(cc.stars[i][0]*W,cc.stars[i][1]*H);
+      ctx.lineTo(cc.stars[i+1][0]*W,cc.stars[i+1][1]*H);ctx.stroke()}
+    let mx=0,my=0;cc.stars.forEach(s=>{mx+=s[0];my+=s[1]});
+    mx=mx/cc.stars.length*W;my=my/cc.stars.length*H;
+    cc.stars.forEach((s,i)=>glowStar(s[0]*W,s[1]*H,2.6,'#ffe2b0','rgba(255,217,160,.85)',.6+.4*Math.abs(Math.sin(clock/1000+i))));
+    ctx.font='11px system-ui';ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,225,176,.7)';ctx.fillText('「'+cc.name+'」',mx,my-10);
+  }
+  /* 画星模式：临时星与虚线预览 */
+  if(drawing){
+    ctx.strokeStyle='rgba(255,217,160,.5)';ctx.setLineDash([4,4]);ctx.lineWidth=1;
+    for(let i=0;i<drawStars.length-1;i++){ctx.beginPath();
+      ctx.moveTo(drawStars[i][0]*W,drawStars[i][1]*H);
+      ctx.lineTo(drawStars[i+1][0]*W,drawStars[i+1][1]*H);ctx.stroke()}
+    ctx.setLineDash([]);
+    drawStars.forEach((s,i)=>{glowStar(s[0]*W,s[1]*H,3,'#ffe2b0','rgba(255,217,160,.9)',1);
+      ctx.font='11px system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(255,225,176,.9)';
+      ctx.fillText(String(i+1),s[0]*W,s[1]*H-10)});
+  }
   /* 收到的礼物星 */
   for(const g of giftStars){
     const st=GIFT_STYLE[g.type],a=.55+.45*Math.abs(Math.sin(clock/1100+g.x*9));
@@ -413,6 +457,9 @@ function renderMine(){
   $('#consBtn').textContent=cn?('点亮'+cn.name+' · '+cn.cost+'✦'):'星座已全点亮';
   $('#consBtn').disabled=!cn||S.sky.starlight<cn.cost||!!(cn&&cn.locked);
   if(cn&&cn.locked)$('#consBtn').textContent=cn.name+' · '+cn.locked;
+  const ccsN=(S.sky.customCons||[]).length;
+  $('#drawBtn').textContent=ccsN>=3?'星座已画满':'画星座 · 20✦';
+  $('#drawBtn').disabled=ccsN>=3||S.sky.starlight<20;
   /* 双人任务 */
   const d=S.sky.daily,ck=x=>x?'<i class="ok">✓</i>':'<i class="no">✗</i>';
   $('#dailyText').innerHTML=S.sky.partner
@@ -491,6 +538,7 @@ function connectSSE(){
     toast('✦ Ta 来了');});
   es.addEventListener('partner_offline',()=>{if(S.sky&&S.sky.partner){S.sky.partner.online=false;renderHeader()}});
   es.addEventListener('rename',e=>{toast('✦ Ta 现在叫「'+JSON.parse(e.data).name+'」');refreshState()});
+  es.addEventListener('cc',e=>{toast('✏️ Ta 在你们夜空画了「'+JSON.parse(e.data).name+'」');meteorShower(4);refreshState()});
 }
 async function replayUnread(){
   try{
@@ -567,6 +615,48 @@ $('#consBtn').onclick=async()=>{
   try{const j=await api('/sky/constellation',{});
     toast('✦ 点亮了'+j.name);meteorShower(5);vibrate(30);refreshState();
   }catch(e){toast(e.message)}};
+/* ---- 画星座模式 ---- */
+let drawing=false,drawStars=[];
+$('#drawBtn').onclick=()=>{
+  drawing=true;drawStars=[];
+  $('#drawBar').classList.remove('hidden');
+  $('#mine').classList.add('hidden');
+  document.querySelectorAll('nav button').forEach(b=>b.disabled=true);
+};
+cv.addEventListener('click',e=>{
+  if(!drawing)return;
+  if(drawStars.length>=8){toast('最多 8 颗');return}
+  const r=cv.getBoundingClientRect();
+  drawStars.push([(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]);
+  vibrate(15);
+  $('#drawHint').textContent=drawStars.length<3
+    ?('再点 '+(3-drawStars.length)+' 颗就能连线（'+drawStars.length+'/8）')
+    :(drawStars.length+' 颗 · 点「完成并命名」收笔');
+});
+function exitDraw(){
+  drawing=false;drawStars=[];
+  $('#drawBar').classList.add('hidden');$('#nameCons').classList.add('hidden');
+  document.querySelectorAll('nav button').forEach(b=>b.disabled=false);
+  $('#mine').classList.remove('hidden');
+}
+$('#drawUndo').onclick=()=>{drawStars.pop();
+  $('#drawHint').textContent=drawStars.length<3
+    ?('再点 '+(3-drawStars.length)+' 颗就能连线（'+drawStars.length+'/8）')
+    :(drawStars.length+' 颗 · 点「完成并命名」收笔');};
+$('#drawQuit').onclick=exitDraw;
+$('#drawDone').onclick=()=>{
+  if(drawStars.length<3){toast('至少 3 颗星');return}
+  $('#ccErr').textContent='';$('#ccName').value='';
+  $('#nameCons').classList.remove('hidden');
+};
+$('#ccBack').onclick=()=>$('#nameCons').classList.add('hidden');
+$('#ccOk').onclick=async()=>{
+  try{
+    await api('/cons/custom',{name:$('#ccName').value.trim(),stars:drawStars});
+    toast('✏️ 「'+$('#ccName').value.trim()+'」升起了，全世界仅此一座');
+    meteorShower(5);vibrate(30);exitDraw();refreshState();
+  }catch(e){$('#ccErr').textContent=e.message}
+};
 document.querySelectorAll('#giftRow button').forEach(b=>b.onclick=async()=>{
   try{await api('/gift',{type:+b.dataset.gift});
     spawnMeteor(true);toast('✨ 星已摘下，飞向 Ta 的夜空');refreshState();

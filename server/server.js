@@ -16,6 +16,9 @@ const GIFT_COST = [20, 50, 120];   // 小星/亮星/彩星
 const GIFT_NAMES = ['小星', '亮星', '彩星'];
 const MSG_COST = 10;         // 星语瓶
 const MSG_DELAY_H = 6;       // 星语瓶 6 小时后才能开启
+const CUSTOM_COST = 20;      // 画一座自定义星座
+const CUSTOM_MAX = 3;        // 最多 3 座
+const CUSTOM_STARS = [3, 8]; // 每座 3-8 颗星
 const CONS_NAMES = ['天琴座', '天鹅座', '仙后座', '猎户座', '天鹰座', '大熊座'];
 const CONS_COST = i => 30 + 20 * i; // 第 i+1 个星座（0 基）
 const OBS_COST = level => 40 * level; // 升到 level+1 级
@@ -88,6 +91,15 @@ CREATE TABLE IF NOT EXISTS chronicle (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_chr_sky ON chronicle(sky_id, id);
+CREATE TABLE IF NOT EXISTS custom_cons (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sky_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  stars TEXT NOT NULL,
+  created_by INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cc_sky ON custom_cons(sky_id, id);
 `);
 
 const app = express();
@@ -238,6 +250,8 @@ function skyOf(p) {
     name: CONS_NAMES[consNextIdx], cost: CONS_COST(consNextIdx),
     locked: consGateOf(sky, consNextIdx),
   } : null;
+  const customCons = db.prepare('SELECT id,name,stars,created_at FROM custom_cons WHERE sky_id=? ORDER BY id').all(sky.id)
+    .map(c => ({ id: c.id, name: c.name, stars: JSON.parse(c.stars), at: c.created_at }));
   const chrCount = db.prepare('SELECT COUNT(*) c FROM chronicle WHERE sky_id=?').get(sky.id).c;
   return {
     id: sky.id,
@@ -250,6 +264,7 @@ function skyOf(p) {
     day: dayIndex(sky),
     observatory: { level: sky.obs_level, nextCost: OBS_COST(sky.obs_level), bonus: r.obs },
     constellations: { count: sky.const_count, names: CONS_NAMES.slice(0, sky.const_count), next: consNext },
+    customCons,
     binary: { unlocked: binaryUnlocked(sky), name: sky.binary_name },
     gifts: { received: gifts.filter(g => !g.mine), given: gifts.filter(g => g.mine).length, total: giftCount },
     messages: { items: msgs, unread: msgs.filter(m => !m.mine && !m.opened && m.openable).length },
@@ -379,6 +394,34 @@ app.post('/api/binary/name', (req, res) => {
   const t = partnerOf(p);
   if (t) sendTo(t.id, 'binary', { name });
   res.json({ ok: true, name });
+});
+
+// ---- 自定义星座：亲手画一座
+app.post('/api/cons/custom', (req, res) => {
+  const p = requirePlayer(req, res); if (!p) return;
+  const sky = p.sky_id && db.prepare('SELECT * FROM skies WHERE id=?').get(p.sky_id);
+  if (!sky) return res.status(400).json({ error: '还没有星空' });
+  const count = db.prepare('SELECT COUNT(*) c FROM custom_cons WHERE sky_id=?').get(sky.id).c;
+  if (count >= CUSTOM_MAX) return res.status(400).json({ error: `最多画 ${CUSTOM_MAX} 座星座` });
+  const name = String(req.body.name || '').trim().slice(0, 12);
+  if (!name) return res.status(400).json({ error: '给星座起个名字' });
+  let stars = req.body.stars;
+  if (!Array.isArray(stars) || stars.length < CUSTOM_STARS[0] || stars.length > CUSTOM_STARS[1])
+    return res.status(400).json({ error: `每座星座 ${CUSTOM_STARS[0]}-${CUSTOM_STARS[1]} 颗星` });
+  for (const s of stars) {
+    if (!Array.isArray(s) || s.length !== 2 || !s.every(v => typeof v === 'number' && v >= 0 && v <= 1))
+      return res.status(400).json({ error: '星的位置数据不合法' });
+  }
+  if (sky.starlight < CUSTOM_COST) return res.status(400).json({ error: `星光不足，画星座需要 ${CUSTOM_COST}` });
+  db.prepare('UPDATE skies SET starlight=starlight-? WHERE id=?').run(CUSTOM_COST, sky.id);
+  const r = db.prepare('INSERT INTO custom_cons(sky_id,name,stars,created_by,created_at) VALUES(?,?,?,?,?)')
+    .run(sky.id, name, JSON.stringify(stars), p.id, now());
+  chron(sky.id, 'cc:' + r.lastInsertRowid, count === 0
+    ? `✏️ 你们画下了第一座星座「${name}」，全世界仅此一座`
+    : `✏️ 「${name}」升起在你们的夜空`);
+  res.json({ ok: true, id: r.lastInsertRowid, cost: CUSTOM_COST, starlight: sky.starlight - CUSTOM_COST });
+  const t = partnerOf(p);
+  if (t) sendTo(t.id, 'cc', { name, stars });
 });
 
 // ---- 摘星送 Ta
