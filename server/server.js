@@ -297,6 +297,7 @@ function skyOf(p) {
     observatory: { level: sky.obs_level, nextCost: OBS_COST(sky.obs_level), bonus: r.obs },
     constellations: { count: sky.const_count, names: CONS_NAMES.slice(0, sky.const_count), next: consNext },
     customCons,
+    customCost: CUSTOM_COST,
     binary: { unlocked: binaryUnlocked(sky), name: sky.binary_name },
     gifts: { received: gifts.filter(g => !g.mine), given: gifts.filter(g => g.mine).length, total: giftCount },
     messages: { items: msgs, unread: msgs.filter(m => !m.mine && !m.opened && m.openable).length },
@@ -531,7 +532,7 @@ app.post('/api/draw', (req, res) => {
     chron(sky.id, 'wish:' + prize, `🎁 心愿「${prize}」第一次被抽中，记得兑现`);
   }
   markDaily(p.id, 'poked'); // 抽心愿也算今日互动
-  res.json({ ok: true, prize, starlight: sky.starlight - DRAW_COST });
+  res.json({ ok: true, prize, pool: parsed.length ? 'custom' : 'default', starlight: sky.starlight - DRAW_COST });
   sendTo(t.id, 'prize', { prize, name: p.name });
 });
 app.get('/api/tickets', (req, res) => {

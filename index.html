@@ -42,6 +42,7 @@ header{position:relative;z-index:2;display:flex;align-items:center;justify-conte
 #golden{color:var(--warm-dim)}
 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#8be9b8;box-shadow:0 0 6px rgba(139,233,184,.9);animation:breathe 2s ease-in-out infinite;margin-right:5px;vertical-align:1px}
 #partner{color:rgba(190,235,208,.8)}
+#balBadge{color:var(--warm-dim);font-variant-numeric:tabular-nums;letter-spacing:0}
 main{position:relative;flex:1;z-index:2}
 .view{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;padding:0 14px 16px;overflow-y:auto}
 .view.hidden{display:none}
@@ -138,6 +139,10 @@ nav button{flex-direction:column;height:40px;font-size:11px;letter-spacing:2px;p
 #mine .rowbtn button .ico{width:14px;height:14px;flex:0 0 auto}
 .gdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
 #pending{font-variant-numeric:tabular-nums}
+#collect.cool{color:var(--warm-dim);border-color:rgba(255,217,160,.22);font-weight:400}
+#collect.ready{animation:pulse .55s ease 2}
+@keyframes pulse{50%{transform:scale(1.04)}}
+.wextra{display:none}
 nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
   width:4px;height:4px;border-radius:50%;background:var(--warm)}
 .daybadge{font-size:12px;color:var(--warm-dim);letter-spacing:3px;margin-bottom:10px;align-self:center}
@@ -151,6 +156,7 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
     <div class="brand">摘星</div>
     <div id="status">
       <button id="soundBtn" class="iconbtn" title="音效"></button>
+      <span id="balBadge" class="hidden"></span>
       <span id="dayBadge"></span>
       <span id="weather"></span>
       <span id="golden" class="hidden">黄金×2</span>
@@ -167,8 +173,9 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
         <div class="rowbtn">
           <button id="obsBtn">升级观星台</button>
           <button id="consBtn">点亮星座</button>
-          <button id="drawBtn">画星座 · 20✦</button>
+          <button id="drawBtn">画星座</button>
         </div>
+        <div class="rowbtn"><button id="inviteBtn" class="warm" style="display:none">邀请 Ta 加入</button></div>
         <div class="hint" id="rateHint"></div>
       </div>
       <div class="card" id="dailyCard">
@@ -268,10 +275,11 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
       <div class="sub">Ta 抽中的就是你的心愿——写真实想要的，见面兑现</div>
       <input class="witem" maxlength="16" placeholder="心愿 1（如：一顿火锅）">
       <input class="witem" maxlength="16" placeholder="心愿 2">
-      <input class="witem" maxlength="16" placeholder="心愿 3">
-      <input class="witem" maxlength="16" placeholder="心愿 4">
-      <input class="witem" maxlength="16" placeholder="心愿 5">
-      <input class="witem" maxlength="16" placeholder="心愿 6">
+      <input class="witem wextra" maxlength="16" placeholder="心愿 3">
+      <input class="witem wextra" maxlength="16" placeholder="心愿 4">
+      <input class="witem wextra" maxlength="16" placeholder="心愿 5">
+      <input class="witem wextra" maxlength="16" placeholder="心愿 6">
+      <button id="wishMore" class="ghost" style="height:30px">＋ 展开更多心愿位</button>
       <div class="err" id="wishErr"></div>
       <div class="rowbtn"><button id="wishSave" class="big warm">保存心愿单</button>
         <button id="wishClose" class="ghost" style="margin:0">关闭</button></div>
@@ -557,6 +565,9 @@ const fmtTime=ts=>{const d=new Date(ts),n=new Date();
 
 /* ================= 状态渲染 ================= */
 function renderHeader(){
+  const bb=$('#balBadge');
+  if(S.sky){bb.classList.remove('hidden');bb.textContent='✦ '+S.sky.starlight}
+  else bb.classList.add('hidden');
   $('#dayBadge').textContent=S.sky?('第 '+S.sky.day+' 天'):'';
   $('#weather').textContent=S.sky?(S.sky.weather.name+' ×'+S.sky.weather.mult):'';
   $('#golden').classList.toggle('hidden',!(S.sky&&S.sky.golden));
@@ -573,8 +584,15 @@ function renderMine(){
   $('#balance').textContent=S.sky.starlight;
   const c=S.sky.collect||{hours:0,amount:0,nextInMin:60,batch:3};
   const cbtn=$('#collect');
-  if(c.hours>=1){cbtn.disabled=false;cbtn.innerHTML=ico('star')+'收集 '+c.amount+' ✦'}
-  else{cbtn.disabled=true;cbtn.innerHTML=ico('star')+'约 '+c.nextInMin+' 分钟后可收'}
+  window._collectDeadline=stateAt+(c.nextInMin||0)*60000;
+  if(c.hours>=1){
+    if(window._collectReady===false){cbtn.classList.add('ready');setTimeout(()=>cbtn.classList.remove('ready'),1300)}
+    window._collectReady=true;cbtn.classList.remove('cool');cbtn.disabled=false;
+    cbtn.innerHTML=ico('star')+'收集 '+c.amount+' ✦';
+  }else{
+    window._collectReady=false;cbtn.classList.remove('cool');cbtn.disabled=false;cbtn.classList.add('cool');
+    updateCollectCountdown();
+  }
   const r=S.sky.rate;
   const parts=['基础'+(r.base-r.obs-r.cons)];if(r.obs)parts.push('观星台+'+r.obs);if(r.cons)parts.push('星座+'+r.cons);
   if(r.partnerActive)parts.push('Ta同行+30%');
@@ -586,9 +604,10 @@ function renderMine(){
   if(cn)$('#consBtn').innerHTML='<span class="bl">'+ico('cons')+cn.name+'</span><small>'+(cn.locked?cn.locked:cn.cost+' ✦')+'</small>';
   else $('#consBtn').innerHTML='<span class="bl">'+ico('cons')+'星座</span><small>全部点亮</small>';
   $('#consBtn').disabled=!cn||S.sky.starlight<cn.cost||!!(cn&&cn.locked);
-  const ccsN=(S.sky.customCons||[]).length;
-  $('#drawBtn').innerHTML='<span class="bl">'+ico('pen')+'画星座</span><small>'+(ccsN>=3?'已满 3 / 3':(ccsN?'20 ✦ · '+ccsN+'/3':'20 ✦'))+'</small>';
-  $('#drawBtn').disabled=ccsN>=3||S.sky.starlight<20;
+  const ccsN=(S.sky.customCons||[]).length,ccCost=S.sky.customCost||4;
+  $('#drawBtn').innerHTML='<span class="bl">'+ico('pen')+'画星座</span><small>'+(ccsN>=3?'已满 3 / 3':(ccCost+' ✦'+(ccsN?' · '+ccsN+'/3':'')))+'</small>';
+  $('#drawBtn').disabled=ccsN>=3||S.sky.starlight<ccCost;
+  $('#inviteBtn').style.display=S.sky.partner?'none':'';
   /* 双人任务：2×2 视图 */
   const d=S.sky.daily,cell=(label,ok)=>'<div class="dcell"><span>'+label+'</span>'+(ok?'<i class="ok">✓</i>':'<i class="no">✗</i>')+'</div>';
   $('#dailyText').innerHTML=S.sky.partner
@@ -678,15 +697,16 @@ async function refreshState(){
   try{const j=await api('/api/sky/state');S=j;stateAt=Date.now();
     renderHeader();renderMine();renderTa();renderChron();}catch(e){}
 }
+function updateCollectCountdown(){
+  const dl=window._collectDeadline||0,left=Math.ceil((dl-Date.now())/1000),b=$('#collect');
+  if(left<=0){refreshState();return}
+  const m=Math.floor(left/60),s=String(left%60).padStart(2,'0');
+  b.innerHTML=ico('star')+'汇聚中 '+m+':'+s;
+}
 setInterval(()=>{
   if(!S.sky||!S.sky.collect||$('#mine').classList.contains('hidden'))return;
-  const c=S.sky.collect;
-  if(c.hours<1){
-    const left=c.nextInMin-Math.floor((Date.now()-stateAt)/60000);
-    if(left<=0)refreshState();
-    else $('#collect').innerHTML=ico('star')+'约 '+left+' 分钟后可收';
-  }
-},10000);
+  if(window._collectReady===false)updateCollectCountdown();
+},1000);
 
 /* ================= SSE ================= */
 function connectSSE(){
@@ -780,7 +800,10 @@ $('#collect').onclick=async()=>{
   }catch(e){toast(e.message)}};
 $('#pokeBtn').onclick=async()=>{
   spawnMeteor(true);vibrate(20);SFX.pokeSend();
-  try{await api('/poke',{});S.sky.pokes.mine++;renderTa();refreshState()}
+  try{await api('/poke',{});S.sky.pokes.mine++;renderTa();refreshState();
+    const b=$('#pokeBtn'),old=b.innerHTML;b.innerHTML='已送达 ✦';b.disabled=true;
+    setTimeout(()=>{b.innerHTML=old;b.disabled=false},900);
+  }
   catch(e){toast(e.message)}};
 $('#obsBtn').onclick=async()=>{
   try{const j=await api('/sky/upgrade',{});
@@ -833,8 +856,12 @@ $('#ccOk').onclick=async()=>{
   }catch(e){$('#ccErr').textContent=e.message}
 };
 $('#msgSend').onclick=async()=>{
+  const btn=$('#msgSend'),old=btn.textContent;
   try{await api('/message',{text:$('#msgInput').value});
-    $('#msgInput').value='';SFX.msg();toast('🍾 星语瓶已漂出，6 小时后 Ta 才能开瓶');refreshState();
+    $('#msgInput').value='';SFX.msg();
+    btn.textContent='已寄出 ✓';btn.disabled=true;
+    setTimeout(()=>{btn.textContent=old;btn.disabled=false},1500);
+    toast('🍾 星语瓶已漂出，6 小时后 Ta 才能开瓶');refreshState();
   }catch(e){toast(e.message)}};
 $('#msgInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('#msgSend').click()});
 $('#claimBtn').onclick=async()=>{
@@ -887,23 +914,41 @@ $('#bottleBtn').onclick=()=>{
 };
 $('#bottleClose').onclick=()=>$('#bottles').classList.add('hidden');
 $('#bottles').addEventListener('click',e=>{if(e.target===$('#bottles'))$('#bottles').classList.add('hidden')});
+$('#inviteBtn').onclick=()=>{
+  $('#inviteCode').textContent=S.sky.inviteCode;
+  $('#inviteLink').textContent=location.origin+'/#'+S.sky.inviteCode;
+  $('#share').classList.remove('hidden');};
 /* ---- 心愿单 / 抽奖 / 心愿券 ---- */
-$('#wishDraw').onclick=async()=>{
+async function doDraw(){
   try{const j=await api('/draw',{});
     meteorShower(3);vibrate(30);SFX.gift();
     $('#drawPrize').textContent=j.prize;
-    $('#drawSub').textContent='这是 '+(S.sky.partner?S.sky.partner.name:'Ta')+' 写下的心愿——由你来实现';
-    S.sky.starlight=j.starlight;renderMine();
+    $('#drawSub').textContent=(j.pool==='default')
+      ?((S.sky.partner?S.sky.partner.name:'Ta')+' 还没写心愿单——先抽中了默认心愿，去提醒 Ta 写下真实想要的')
+      :('这是 '+(S.sky.partner?S.sky.partner.name:'Ta')+' 写下的心愿——由你来实现');
+    S.sky.starlight=j.starlight;renderMine();renderHeader();
     $('#drawResult').classList.remove('hidden');
-  }catch(e){toast(e.message)}};
-$('#drawAgain').onclick=()=>{$('#drawResult').classList.add('hidden');$('#wishDraw').click()};
+  }catch(e){
+    $('#drawSub').textContent='✦ '+e.message+'（右上角余额，去星空页收集）'; // 留在弹窗内引导，不丢上下文
+  }
+}
+$('#wishDraw').onclick=doDraw;
+$('#drawAgain').onclick=doDraw;
 $('#drawOk').onclick=()=>$('#drawResult').classList.add('hidden');
 $('#drawResult').addEventListener('click',e=>{if(e.target===$('#drawResult'))$('#drawResult').classList.add('hidden')});
 $('#wishBtn').onclick=async()=>{
   try{const j=await api('/api/wishlist');
-    document.querySelectorAll('#wishEdit input').forEach((inp,i)=>{inp.value=j.mine[i]||''});
+    const inputs=[...document.querySelectorAll('#wishEdit input')];
+    inputs.forEach((inp,i)=>{inp.value=j.mine[i]||''});
+    const extras=inputs.slice(2);
+    const hasExtra=extras.some(i=>i.value);
+    extras.forEach(i=>i.style.display=hasExtra?'':'none');
+    $('#wishMore').style.display=hasExtra?'none':'';
     $('#wishErr').textContent='';$('#wishEdit').classList.remove('hidden');
   }catch(e){toast(e.message)}};
+$('#wishMore').onclick=()=>{
+  document.querySelectorAll('#wishEdit .wextra').forEach(i=>i.style.display='');
+  $('#wishMore').style.display='none';};
 $('#wishClose').onclick=()=>$('#wishEdit').classList.add('hidden');
 $('#wishEdit').addEventListener('click',e=>{if(e.target===$('#wishEdit'))$('#wishEdit').classList.add('hidden')});
 $('#wishSave').onclick=async()=>{
