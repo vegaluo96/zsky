@@ -2,33 +2,413 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hello World · zsky</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b1026">
+<title>摘星 · 为你摘星</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #fff;
-  }
-  .card {
-    text-align: center; padding: 3rem 4rem; border-radius: 16px;
-    background: rgba(255,255,255,.06); backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,.12);
-  }
-  h1 { font-size: 3rem; margin-bottom: .8rem; }
-  p { color: rgba(255,255,255,.75); }
-  .badge {
-    display: inline-block; margin-top: 1.5rem; padding: .3rem .9rem;
-    border-radius: 999px; font-size: .85rem; background: rgba(255,255,255,.12);
-  }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--ink:#e8ecff;--dim:rgba(232,236,255,.6);--glow:#8ea8ff;--warm:#ffd9a0;--bg0:#05070f;--bg1:#0b1026;--bg2:#1b1740}
+html,body{height:100%;overflow:hidden;background:var(--bg0)}
+body{font-family:system-ui,-apple-system,"PingFang SC","HarmonyOS Sans SC",sans-serif;color:var(--ink);touch-action:manipulation;user-select:none}
+/* 夜幕降临 loading */
+#load{position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#02030a,#0b1026 60%,#141033);transition:opacity 1.2s ease}
+#load.off{opacity:0;pointer-events:none}
+#load h1{font-size:34px;letter-spacing:14px;text-indent:14px;font-weight:600;color:var(--ink);
+  text-shadow:0 0 24px rgba(142,168,255,.9);animation:breathe 2.4s ease-in-out infinite}
+#load p{margin-top:14px;font-size:12px;letter-spacing:4px;color:var(--dim)}
+@keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app.hidden{display:none}
+#app.shake{animation:shake .38s ease}
+@keyframes shake{0%,100%{transform:none}20%{transform:translate(3px,-2px)}40%{transform:translate(-3px,2px)}60%{transform:translate(2px,2px)}80%{transform:translate(-2px,-1px)}}
+#sky{position:absolute;inset:0;background:
+  radial-gradient(120% 80% at 70% 110%,rgba(64,48,120,.55),transparent 60%),
+  radial-gradient(100% 70% at 20% -10%,rgba(30,40,90,.6),transparent 55%),
+  linear-gradient(180deg,var(--bg1),var(--bg2) 75%,#241a4d)}
+header{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px 6px;font-size:13px}
+.brand{font-weight:700;letter-spacing:6px;text-shadow:0 0 14px rgba(142,168,255,.8)}
+#status{display:flex;align-items:center;gap:10px;color:var(--dim)}
+#golden{color:var(--warm);text-shadow:0 0 10px rgba(255,217,160,.7)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#7dffa8;
+  box-shadow:0 0 8px #7dffa8;animation:breathe 2s ease-in-out infinite;margin-right:5px;vertical-align:1px}
+#partner{color:#aef7c8}
+main{position:relative;flex:1;z-index:2}
+.view{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 24px 26px}
+.view.hidden{display:none}
+.res{font-size:15px;color:var(--dim);margin-bottom:14px}
+.res b{font-size:26px;color:var(--ink);text-shadow:0 0 16px rgba(142,168,255,.9);margin:0 4px}
+button{font-family:inherit;color:var(--ink);background:rgba(142,168,255,.12);border:1px solid rgba(142,168,255,.45);
+  border-radius:999px;padding:14px 34px;font-size:17px;letter-spacing:2px;cursor:pointer;
+  backdrop-filter:blur(6px);transition:transform .15s ease,box-shadow .3s ease}
+button:active{transform:scale(.96)}
+.big{box-shadow:0 0 24px rgba(142,168,255,.25),inset 0 0 18px rgba(142,168,255,.08)}
+.warm{background:rgba(255,217,160,.14);border-color:rgba(255,217,160,.55);color:var(--warm);
+  box-shadow:0 0 26px rgba(255,217,160,.28),inset 0 0 18px rgba(255,217,160,.08)}
+.ghost{background:transparent;border-color:rgba(232,236,255,.25);color:var(--dim);font-size:14px;padding:10px 22px;margin-top:14px}
+.hint{margin-top:12px;font-size:12px;color:var(--dim);letter-spacing:1px}
+#tlList{max-height:52vh;overflow:auto;margin-top:10px;width:100%;font-size:13px;line-height:2;color:var(--dim)}
+#tlList b{color:var(--warm);font-weight:600}
+.overlay{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(5,7,15,.55);backdrop-filter:blur(10px);padding:24px}
+.overlay.hidden{display:none}
+.card{width:min(400px,100%);background:linear-gradient(170deg,rgba(27,23,64,.92),rgba(11,16,38,.95));
+  border:1px solid rgba(142,168,255,.25);border-radius:20px;padding:26px 24px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 40px rgba(142,168,255,.12);text-align:center}
+.card h2{font-size:19px;letter-spacing:4px;margin-bottom:6px}
+.card .sub{font-size:12px;color:var(--dim);margin-bottom:18px;line-height:1.8}
+.card input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(142,168,255,.3);
+  border-radius:12px;padding:12px 14px;color:var(--ink);font-size:16px;text-align:center;outline:none;margin-bottom:12px}
+.card input:focus{border-color:var(--glow);box-shadow:0 0 14px rgba(142,168,255,.25)}
+.card .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.card button{padding:12px 22px;font-size:15px}
+.code{font-size:34px;letter-spacing:12px;text-indent:12px;margin:8px 0 4px;color:var(--ink);
+  text-shadow:0 0 20px rgba(142,168,255,.9);font-weight:700}
+.link{font-size:11px;color:var(--dim);word-break:break-all}
+.err{color:#ff9d9d;font-size:12px;min-height:18px;margin-bottom:6px}
+#toast{position:absolute;top:16%;left:50%;transform:translateX(-50%);z-index:9;
+  background:rgba(27,23,64,.85);border:1px solid rgba(255,217,160,.4);color:var(--warm);
+  padding:12px 26px;border-radius:999px;font-size:15px;letter-spacing:2px;white-space:nowrap;
+  box-shadow:0 0 30px rgba(255,217,160,.25);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(6px)}
+nav{position:relative;z-index:2;display:flex;padding:10px 20px 14px;gap:12px}
+nav button{flex:1;padding:11px 0;font-size:14px;letter-spacing:3px;background:rgba(255,255,255,.05);border-color:rgba(232,236,255,.16);color:var(--dim)}
+nav button.on{background:rgba(142,168,255,.16);border-color:rgba(142,168,255,.55);color:var(--ink);box-shadow:0 0 18px rgba(142,168,255,.2)}
 </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Hello World 👋</h1>
-    <p>zsky 项目已上线 · 阿里云轻量服务器</p>
-    <span class="badge">Mac → GitHub → deploy → 服务器</span>
-  </div>
+<div id="load"><h1>摘 星</h1><p>夜幕正在降临</p></div>
+<div id="app" class="hidden">
+  <header>
+    <div class="brand">摘星</div>
+    <div id="status">
+      <span id="weather"></span>
+      <span id="golden" class="hidden">黄金时刻×2</span>
+      <span id="partner" class="hidden"></span>
+    </div>
+  </header>
+  <main>
+    <canvas id="sky"></canvas>
+    <section id="mine" class="view hidden">
+      <div class="res">✦<b id="balance">0</b>星光</div>
+      <button id="collect" class="big">收集 <span id="pending">0</span> 星光</button>
+      <div class="hint" id="rateHint"></div>
+    </section>
+    <section id="ta" class="view hidden">
+      <button id="pokeBtn" class="big warm">想 Ta 了</button>
+      <div class="hint" id="pokeHint"></div>
+      <button id="tlBtn" class="ghost">想念时间线</button>
+    </section>
+    <div id="setup" class="overlay hidden"><div class="card">
+      <h2>摘星</h2>
+      <div class="sub">两个人养一片星空<br>想 Ta 了就戳一戳，每一次想念都有记录</div>
+      <input id="nick" maxlength="12" placeholder="你的昵称（可随机）">
+      <div class="err" id="setupErr"></div>
+      <div class="row">
+        <button id="createBtn" class="big">创建我们的星空</button>
+        <button id="toJoin" class="ghost" style="margin:0">我有邀请码</button>
+      </div>
+      <button id="toRestore" class="ghost">用找回码找回星空</button>
+    </div></div>
+    <div id="join" class="overlay hidden"><div class="card">
+      <h2>加入 Ta 的星空</h2>
+      <div class="sub">输入对方分享的 6 位邀请码</div>
+      <input id="joinCode" maxlength="6" placeholder="邀请码" style="text-transform:uppercase;letter-spacing:8px">
+      <input id="joinNick" maxlength="12" placeholder="你的昵称">
+      <div class="err" id="joinErr"></div>
+      <div class="row">
+        <button id="joinBtn" class="big">加入</button>
+        <button id="joinBack" class="ghost" style="margin:0">返回</button>
+      </div>
+    </div></div>
+    <div id="restore" class="overlay hidden"><div class="card">
+      <h2>找回星空</h2>
+      <div class="sub">输入你设置的找回码</div>
+      <input id="restoreCode" maxlength="32" placeholder="找回码">
+      <div class="err" id="restoreErr"></div>
+      <div class="row">
+        <button id="restoreBtn" class="big">找回</button>
+        <button id="restoreBack" class="ghost" style="margin:0">返回</button>
+      </div>
+    </div></div>
+    <div id="share" class="overlay hidden"><div class="card">
+      <h2>你们的星空诞生了</h2>
+      <div class="sub">把邀请码发给 Ta，两个人一起点亮 ✦30 见面星光已到账</div>
+      <div class="code" id="inviteCode"></div>
+      <div class="link" id="inviteLink"></div>
+      <div class="err" id="shareErr"></div>
+      <button id="copyBtn" class="big">复制邀请链接</button>
+      <input id="recoveryCode" maxlength="32" placeholder="设置找回码（换机找回用，≥4位）" style="margin-top:14px">
+      <button id="saveRecovery" class="ghost">保存找回码</button>
+    </div></div>
+    <div id="tl" class="overlay hidden"><div class="card">
+      <h2>想念时间线</h2>
+      <div class="sub" id="tlSummary"></div>
+      <div id="tlList"></div>
+      <button id="tlClose" class="ghost" style="margin-top:16px">回到星空</button>
+    </div></div>
+    <div id="toast"></div>
+  </main>
+  <nav>
+    <button data-view="mine" class="on">我的星空</button>
+    <button data-view="ta">Ta 的星空</button>
+  </nav>
+</div>
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+let TOKEN=localStorage.getItem('zsky_token')||'';
+let S={player:null,sky:null},stateAt=0;
+
+async function api(path,body){
+  const opts={method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-Token':TOKEN}};
+  if(body)opts.body=JSON.stringify(body||{});
+  const r=await fetch(path,opts);const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j;
+}
+
+/* ---------- 星空引擎：光谱色温 / 三层视差 / 离屏预渲染 / 流星 ---------- */
+const cv=$('#sky'),ctx=cv.getContext('2d');
+const SPEC=['#9db4ff','#aabfff','#cad7ff','#f8f7ff','#fff4ea','#ffd2a1','#ffcc6f']; // O..M 光谱序
+const starColor=()=>SPEC[Math.min(6,Math.floor(Math.pow(Math.random(),2)*7))];
+let W,H,DPR,farC,midC,nearStars=[],meteors=[];
+function prerender(n,rmin,rmax){
+  const c=document.createElement('canvas');c.width=W*DPR;c.height=H*DPR;
+  const x=c.getContext('2d');x.setTransform(DPR,0,0,DPR,0,0);
+  for(let i=0;i<n;i++){
+    const sx=Math.random()*W,sy=Math.random()*H,r=rmin+Math.random()*(rmax-rmin);
+    if(r>rmin+(rmax-rmin)*.55){ // 亮星带光晕
+      const g=x.createRadialGradient(sx,sy,0,sx,sy,r*4);
+      g.addColorStop(0,'rgba(220,228,255,.7)');g.addColorStop(1,'rgba(220,228,255,0)');
+      x.globalAlpha=.4;x.fillStyle=g;x.beginPath();x.arc(sx,sy,r*4,0,7);x.fill();x.globalAlpha=1;
+    }
+    x.fillStyle=starColor();x.beginPath();x.arc(sx,sy,r,0,7);x.fill();
+  }
+  return c;
+}
+function resize(){
+  DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
+  cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  farC=prerender(130,.6,1.1);midC=prerender(64,1.1,1.7);
+  nearStars=Array.from({length:40},()=>({x:Math.random()*W,y:Math.random()*H,
+    r:1.2+Math.random()*1.7,c:starColor(),ph:Math.random()*6.28,sp:.6+Math.random()*1.6}));
+}
+addEventListener('resize',resize);
+function spawnMeteor(out){ // out=自己戳出（从底部升向夜空）；否则从夜空划过
+  const x0=out?W*.5:W*.1+Math.random()*W*.8, y0=out?H*.72:-20;
+  const x2=out?x0+(Math.random()*.5+.2)*W*(Math.random()<.5?1:-1):x0+(Math.random()-.3)*W*.5;
+  const y2=out?H*.06:H*.3+Math.random()*H*.3;
+  meteors.push({x0,y0,cx:(x0+x2)/2+(Math.random()-.5)*W*.25,cy:(y0+y2)/2,x2,y2,t:0,
+    dur:out?1100:900+Math.random()*400,trail:[]});
+}
+let px=0,py=0,tx=0,ty=0,lastT=performance.now();
+addEventListener('pointermove',e=>{tx=e.clientX/W-.5;ty=e.clientY/H-.5});
+function qp(a,c,b,t){const u=1-t;return u*u*a+2*u*t*c+t*t*b}
+function frame(t){
+  const dt=Math.min(50,t-lastT);lastT=t;
+  px+=(tx-px)*.05;py+=(ty-py)*.05;
+  ctx.clearRect(0,0,W,H);
+  ctx.drawImage(farC,-px*8,-py*6,W+16,H+12);
+  ctx.drawImage(midC,-px*16,-py*12,W+32,H+24);
+  for(const s of nearStars){
+    const a=.4+.6*Math.abs(Math.sin(s.ph+=s.sp*dt/1000));
+    ctx.globalAlpha=a;ctx.fillStyle=s.c;
+    ctx.beginPath();ctx.arc(s.x-px*26,s.y-py*20,s.r,0,7);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  for(let i=meteors.length-1;i>=0;i--){
+    const m=meteors[i];m.t+=dt/m.dur;
+    if(m.t>=1){meteors.splice(i,1);continue}
+    const e=m.t<.5?2*m.t*m.t:1-Math.pow(-2*m.t+2,2)/2; // easeInOutQuad
+    const x=qp(m.x0,m.cx,m.x2,e),y=qp(m.y0,m.cy,m.y2,e);
+    m.trail.push({x,y});if(m.trail.length>26)m.trail.shift();
+    const g=ctx.createRadialGradient(x,y,0,x,y,26); // 流星头照亮周围
+    g.addColorStop(0,'rgba(255,250,230,.95)');g.addColorStop(.3,'rgba(180,190,255,.5)');g.addColorStop(1,'rgba(140,160,255,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,26,0,7);ctx.fill();
+    m.trail.forEach((p,k)=>{ctx.globalAlpha=k/m.trail.length*.8;
+      ctx.fillStyle='#e9edff';ctx.beginPath();ctx.arc(p.x,p.y,1+k/m.trail.length*2.2,0,7);ctx.fill()});
+    ctx.globalAlpha=1;
+  }
+  requestAnimationFrame(frame);
+}
+const vibrate=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+function shake(){const a=$('#app');a.classList.remove('shake');void a.offsetWidth;a.classList.add('shake')}
+let toastTimer;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600)}
+
+/* ---------- 状态渲染 ---------- */
+const fmtTime=ts=>{const d=new Date(ts),n=new Date();
+  const hm=d.toTimeString().slice(0,5);
+  return d.toDateString()===n.toDateString()?hm:(d.getMonth()+1)+'/'+d.getDate()+' '+hm};
+function renderHeader(){
+  $('#weather').textContent=S.sky?S.sky.weather.name+' ×'+S.sky.weather.mult:'';
+  $('#golden').classList.toggle('hidden',!(S.sky&&S.sky.golden));
+  const p=$('#partner');
+  if(S.sky&&S.sky.partner){p.classList.remove('hidden');
+    p.innerHTML=(S.sky.partner.online?'<i class="dot"></i>':'')+esc(S.sky.partner.name)+(S.sky.partner.online?' 正在望着星空':'')}
+  else p.classList.add('hidden');
+}
+const esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+function renderMine(){
+  $('#balance').textContent=S.sky.starlight;
+  const rate=S.sky.rate*S.sky.weather.mult;
+  $('#rateHint').textContent='✦ '+rate.toFixed(1)+' /小时 · 离线收益封顶 12 小时';
+}
+function renderTa(){
+  const p=S.sky.pokes,partner=S.sky.partner;
+  $('#pokeHint').textContent=partner
+    ?('你们已互相想念 '+(p.mine+p.theirs)+' 次 · Ta 想了你 '+p.theirs+' 次')
+    :'等 Ta 加入后，就能戳一戳了';
+}
+function enterSky(){
+  $('#setup').classList.add('hidden');$('#share').classList.add('hidden');
+  $('#mine').classList.remove('hidden');
+  stateAt=Date.now();renderHeader();renderMine();renderTa();
+  if(!window.es)connectSSE();
+}
+async function refreshState(){
+  try{const j=await api('/api/sky/state');S=j;stateAt=Date.now();
+    renderHeader();renderMine();renderTa();}catch(e){}
+}
+/* 本地星光累积 tick（乐观渲染，收集时以服务器结算为准） */
+setInterval(()=>{
+  if(!S.sky||$('#mine').classList.contains('hidden'))return;
+  const rate=S.sky.rate*S.sky.weather.mult;
+  const pend=Math.min(S.sky.pending+(Date.now()-stateAt)/3600000*rate,S.sky.rate*12*S.sky.weather.mult);
+  $('#pending').textContent=Math.floor(pend);
+},1000);
+
+/* ---------- SSE 实时通道 ---------- */
+function connectSSE(){
+  const es=new EventSource('/api/events?token='+encodeURIComponent(TOKEN));
+  window.es=es;
+  es.addEventListener('poke',e=>{
+    const d=JSON.parse(e.data);
+    spawnMeteor(false);shake();vibrate(40);
+    toast('💫 '+(d.name||'Ta')+' 正在想你');
+    if(d.id)localStorage.setItem('zsky_lastpoke',d.id);
+    refreshState();
+  });
+  es.addEventListener('partner_online',e=>{
+    const d=JSON.parse(e.data);
+    if(d&&d.name)S.sky&&(S.sky.partner=S.sky.partner||{},S.sky.partner.name=d.name);
+    S.sky&&S.sky.partner&&(S.sky.partner.online=true);renderHeader();
+    toast('✦ Ta 来了');
+  });
+  es.addEventListener('partner_offline',()=>{S.sky&&S.sky.partner&&(S.sky.partner.online=false);renderHeader()});
+}
+/* 未读想念回放：错过的流星依次划过 */
+async function replayUnread(){
+  try{
+    const j=await api('/api/poke/timeline?limit=50');
+    const last=+(localStorage.getItem('zsky_lastpoke')||0);
+    const unread=j.items.filter(i=>!i.mine&&i.id>last).reverse();
+    const maxId=Math.max(last,...j.items.map(i=>i.id),0);
+    localStorage.setItem('zsky_lastpoke',maxId);
+    unread.forEach((u,k)=>setTimeout(()=>{
+      spawnMeteor(false);vibrate(20);
+      toast('💫 Ta 在 '+fmtTime(u.at)+' 想过你');
+      if(k===0)shake();
+    },1400+k*1100));
+  }catch(e){}
+}
+
+/* ---------- 设置流程 ---------- */
+function showSetup(){
+  $('#setup').classList.remove('hidden');
+  const names=['星野','月见','晚风','拾光','云雀','远山','澄空','小满','白露','枕星'];
+  $('#nick').value=names[Math.floor(Math.random()*names.length)];
+  const m=location.hash.match(/^#([0-9a-fA-F]{6})$/);
+  if(m){$('#setup').classList.add('hidden');$('#join').classList.remove('hidden');
+    $('#joinCode').value=m[1].toUpperCase();history.replaceState(null,'','/');}
+}
+$('#createBtn').onclick=async()=>{
+  try{const j=await api('/sky/create',{name:$('#nick').value.trim()||undefined});
+    S.sky=j.sky;S.player&&(S.player.name=$('#nick').value.trim()||S.player.name);
+    $('#inviteCode').textContent=S.sky.inviteCode;
+    $('#inviteLink').textContent=location.origin+'/#'+S.sky.inviteCode;
+    $('#mine').classList.remove('hidden');renderMine();
+    $('#setup').classList.add('hidden');$('#share').classList.remove('hidden');
+    spawnMeteor(true);toast('✦ +30 星光见面礼');
+    if(!window.es)connectSSE();
+  }catch(e){$('#setupErr').textContent=e.message}
+};
+$('#toJoin').onclick=()=>{$('#setup').classList.add('hidden');$('#join').classList.remove('hidden');$('#joinNick').value=$('#nick').value};
+$('#joinBack').onclick=()=>{$('#join').classList.add('hidden');$('#setup').classList.remove('hidden')};
+$('#joinBtn').onclick=async()=>{
+  try{const j=await api('/sky/join',{code:$('#joinCode').value.trim(),name:$('#joinNick').value.trim()||undefined});
+    S.sky=j.sky;spawnMeteor(false);toast('✦ 你们的星空连上了');enterSky();
+  }catch(e){$('#joinErr').textContent=e.message}
+};
+$('#toRestore').onclick=()=>{$('#setup').classList.add('hidden');$('#restore').classList.remove('hidden')};
+$('#restoreBack').onclick=()=>{$('#restore').classList.add('hidden');$('#setup').classList.remove('hidden')};
+$('#restoreBtn').onclick=async()=>{
+  try{const j=await api('/player/restore',{code:$('#restoreCode').value.trim()});
+    TOKEN=j.token;localStorage.setItem('zsky_token',TOKEN);S.player=j.player;S.sky=j.sky;
+    if(window.es){window.es.close();window.es=null}
+    toast('✦ 星空找回来了');S.sky?enterSky():showSetup();
+  }catch(e){$('#restoreErr').textContent=e.message}
+};
+$('#copyBtn').onclick=async()=>{
+  try{await navigator.clipboard.writeText(location.origin+'/#'+S.sky.inviteCode);toast('邀请链接已复制，发给 Ta 吧')}
+  catch(e){toast('长按邀请码复制：'+S.sky.inviteCode)}
+};
+$('#saveRecovery').onclick=async()=>{
+  try{await api('/player/recovery',{code:$('#recoveryCode').value.trim()});
+    toast('找回码已保存，记住它');$('#recoveryCode').value=''}
+  catch(e){$('#shareErr').textContent=e.message}
+};
+$('#share').addEventListener('click',e=>{if(e.target===$('#share')){$('#share').classList.add('hidden')}});
+
+/* ---------- 主交互 ---------- */
+$('#collect').onclick=async()=>{
+  try{const j=await api('/sky/collect',{});
+    S.sky.starlight=j.starlight;S.sky.pending=0;stateAt=Date.now();
+    renderMine();vibrate(15);
+    toast(j.gained>0?('✦ +'+j.gained+' 星光'+(j.golden?' · 黄金时刻×2！':'')):'星光还在路上，等等 Ta');
+    for(let i=0;i<4;i++)setTimeout(()=>spawnMeteor(false),i*260);
+  }catch(e){toast(e.message)}
+};
+$('#pokeBtn').onclick=async()=>{
+  spawnMeteor(true);vibrate(20);
+  try{await api('/poke',{});S.sky.pokes.mine++;renderTa()}
+  catch(e){toast(e.message)}
+};
+$('#tlBtn').onclick=async()=>{
+  try{const j=await api('/api/poke/timeline?limit=100');
+    $('#tlSummary').textContent='共 '+(S.sky.pokes.mine+S.sky.pokes.theirs)+' 次想念 · 你 '+S.sky.pokes.mine+' / Ta '+S.sky.pokes.theirs;
+    $('#tlList').innerHTML=j.items.length?j.items.map(i=>
+      '<div>'+(i.mine?'你 → Ta':'<b>Ta → 你</b>')+' · '+fmtTime(i.at)+'</div>').join(''):'<div style="text-align:center">还没有想念记录<br>去戳一戳吧</div>';
+    $('#tl').classList.remove('hidden');
+  }catch(e){toast(e.message)}
+};
+$('#tlClose').onclick=()=>$('#tl').classList.add('hidden');
+$('#tl').addEventListener('click',e=>{if(e.target===$('#tl'))$('#tl').classList.add('hidden')});
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  $('#mine').classList.toggle('hidden',b.dataset.view!=='mine');
+  $('#ta').classList.toggle('hidden',b.dataset.view!=='ta');
+});
+
+/* ---------- 启动：夜幕降临 ---------- */
+async function boot(){
+  const wait=new Promise(r=>setTimeout(r,1100));
+  resize();requestAnimationFrame(frame);
+  try{
+    const j=await api('/player/init',{});
+    if(!TOKEN){TOKEN=j.token;localStorage.setItem('zsky_token',TOKEN)}
+    S.player=j.player;S.sky=j.sky;
+  }catch(e){toast('连接星空失败，请刷新重试')}
+  await wait;
+  $('#load').classList.add('off');$('#app').classList.remove('hidden');
+  if(S.sky)  {enterSky();replayUnread()}
+  else showSetup();
+}
+boot();
+</script>
 </body>
 </html>
