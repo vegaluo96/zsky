@@ -11,7 +11,7 @@
   --ink:#eef1ff;--dim:rgba(238,241,255,.58);--faint:rgba(238,241,255,.36);
   --warm:#ffd9a0;--warm-dim:rgba(255,217,160,.6);
   --hair:rgba(255,255,255,.10);--hair-strong:rgba(255,255,255,.17);
-  --glass:rgba(13,17,38,.55);--glass-hi:rgba(255,255,255,.05);
+  --glass:rgba(13,17,38,.64);--glass-hi:rgba(255,255,255,.05);
   --bg1:#0b1026;--bg2:#1b1740;--r-card:20px;--r-btn:14px
 }
 html,body{height:100%;overflow:hidden;background:#05070f}
@@ -72,17 +72,21 @@ button{font-family:inherit;color:var(--ink);cursor:pointer;
   transition:transform .12s ease,background .2s ease}
 button:active{transform:scale(.965);background:rgba(255,255,255,.09)}
 button:disabled{opacity:.35}
-.big{height:52px;font-size:17px;padding:0 32px;letter-spacing:2px}
+.big{height:52px;font-size:17px;padding:0 32px;letter-spacing:2px;font-weight:600;
+  border-color:rgba(255,255,255,.24);
+  background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.03))}
 .warm{color:var(--warm);border-color:rgba(255,217,160,.38);
   background:linear-gradient(180deg,rgba(255,217,160,.13),rgba(255,217,160,.035))}
 .ghost{background:none;border-color:transparent;box-shadow:none;color:var(--dim);height:36px;font-size:13px}
 .ghost:active{background:rgba(255,255,255,.06);color:var(--ink)}
-.rowbtn{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%}
+.rowbtn{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;width:100%}
 .rowbtn button{flex:1;min-width:0}
 .res{font-size:13px;color:var(--dim);letter-spacing:1px}
 .res b{font-size:30px;color:var(--ink);font-weight:650;margin:0 5px;font-variant-numeric:tabular-nums}
 .hint{font-size:12px;color:var(--faint);line-height:1.7;text-align:center;max-width:420px}
 .hint b{color:var(--warm)}
+#dailyText .ok{color:var(--warm);font-style:normal;font-weight:600}
+#dailyText .no{opacity:.32;font-style:normal}
 /* 送星：两行结构 */
 #giftRow button{height:auto;padding:9px 6px;display:flex;flex-direction:column;gap:3px;align-items:center}
 #giftRow button small{font-size:11px;letter-spacing:0;color:var(--warm-dim)}
@@ -135,7 +139,7 @@ nav button.on::after{content:'';position:absolute;bottom:4px;left:50%;transform:
     <section id="mine" class="view hidden">
       <div class="panel">
         <div class="res">✦ <b id="balance">0</b> 星光</div>
-        <button id="collect" class="big">收集 <span id="pending">0</span> 星光</button>
+        <button id="collect" class="big warm">收集 <span id="pending">0</span> 星光</button>
         <div class="rowbtn">
           <button id="obsBtn">升级观星台</button>
           <button id="consBtn">点亮星座</button>
@@ -376,6 +380,9 @@ let toastTimer;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600)}
 const esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const fmtAgo=ts=>{const m=Math.floor((Date.now()-ts)/60000);
+  if(m<1)return'刚刚';if(m<60)return m+' 分钟';const h=Math.floor(m/60);
+  if(h<24)return h+' 小时';return Math.floor(h/24)+' 天'};
 const fmtTime=ts=>{const d=new Date(ts),n=new Date();
   const hm=d.toTimeString().slice(0,5);
   return d.toDateString()===n.toDateString()?hm:(d.getMonth()+1)+'/'+d.getDate()+' '+hm};
@@ -387,7 +394,9 @@ function renderHeader(){
   $('#golden').classList.toggle('hidden',!(S.sky&&S.sky.golden));
   const p=$('#partner');
   if(S.sky&&S.sky.partner){p.classList.remove('hidden');
-    p.innerHTML=(S.sky.partner.online?'<i class="dot"></i>':'')+esc(S.sky.partner.name)+(S.sky.partner.online?' 正在望着星空':'')}
+    p.innerHTML=S.sky.partner.online
+      ?'<i class="dot"></i>'+esc(S.sky.partner.name)+' 正在望着星空'
+      :esc(S.sky.partner.name)+' · '+fmtAgo(S.sky.partner.lastActive||Date.now())+'前在线'}
   else p.classList.add('hidden');
 }
 function renderMine(){
@@ -404,7 +413,7 @@ function renderMine(){
   $('#consBtn').disabled=!cn||S.sky.starlight<cn.cost||!!(cn&&cn.locked);
   if(cn&&cn.locked)$('#consBtn').textContent=cn.name+' · '+cn.locked;
   /* 双人任务 */
-  const d=S.sky.daily,ck=x=>x?'✓':'✗';
+  const d=S.sky.daily,ck=x=>x?'<i class="ok">✓</i>':'<i class="no">✗</i>';
   $('#dailyText').innerHTML=S.sky.partner
     ?('收集 '+ck(d.me.collected)+' / 想念 '+ck(d.me.poked)+'（你）&nbsp;&nbsp;收集 '+ck(d.ta.collected)+' / 想念 '+ck(d.ta.poked)+'（Ta）')
     :'等 Ta 加入后一起做任务';
