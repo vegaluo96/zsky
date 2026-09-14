@@ -113,6 +113,7 @@ button:disabled{opacity:.35}
 #tlInline .tlrow{display:flex;justify-content:space-between;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.06)}
 #tlInline .tlrow span{opacity:.5;font-size:12px}
 #tlInline b{color:var(--warm);font-weight:600}
+#wishEdit input{margin:5px 0;padding:9px 14px;font-size:14px}
 .bottle{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--hair);
   border-radius:12px;padding:8px 12px;margin:6px 0;font-size:13px}
 .bottle .txt{color:var(--ink);line-height:1.6}
@@ -183,14 +184,17 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
       <button id="pokeBtn" class="big warm"><span data-ico="heart"></span>想 Ta 了</button>
       <div class="hint" id="pokeHint"></div>
       <div class="panel">
+        <button id="wishDraw" class="big warm">为 Ta 抽心愿 · 1 ✦</button>
         <div class="rowbtn" id="giftRow">
-          <button data-gift="0"><span class="bl"><i class="gdot" style="background:#eef2ff;box-shadow:0 0 6px rgba(238,242,255,.9)"></i>小星</span><small>20 ✦</small></button>
-          <button data-gift="1"><span class="bl"><i class="gdot" style="background:#ffd9a0;box-shadow:0 0 6px rgba(255,217,160,.9)"></i>亮星</span><small>50 ✦</small></button>
-          <button data-gift="2"><span class="bl"><i class="gdot" style="background:#9ff0e2;box-shadow:0 0 6px rgba(159,240,226,.9)"></i>彩星</span><small>120 ✦</small></button>
+          <button data-gift="0"><span class="bl"><i class="gdot" style="background:#eef2ff;box-shadow:0 0 6px rgba(238,242,255,.9)"></i>小星</span><small>4 ✦</small></button>
+          <button data-gift="1"><span class="bl"><i class="gdot" style="background:#ffd9a0;box-shadow:0 0 6px rgba(255,217,160,.9)"></i>亮星</span><small>10 ✦</small></button>
+          <button data-gift="2"><span class="bl"><i class="gdot" style="background:#9ff0e2;box-shadow:0 0 6px rgba(159,240,226,.9)"></i>彩星</span><small>24 ✦</small></button>
         </div>
-        <div class="rowbtn"><input id="msgInput" maxlength="50" placeholder="写一句星语，装进瓶子（10✦）">
+        <div class="rowbtn"><input id="msgInput" maxlength="50" placeholder="写一句星语，装进瓶子（2✦）">
           <button id="msgSend">寄出</button></div>
         <div class="rowbtn">
+          <button id="wishBtn" class="ghost"><span data-ico="heart"></span>我的心愿单</button>
+          <button id="ticketBtn" class="ghost"><span data-ico="star"></span>心愿券</button>
           <button id="bottleBtn" class="ghost"><span data-ico="bottle"></span>星语瓶<span id="bottleBadge" class="badge" style="display:none"></span></button>
         </div>
       </div>
@@ -265,6 +269,32 @@ nav button.on::after{content:'';position:absolute;bottom:2px;left:50%;transform:
       <h2>星语瓶</h2><div class="sub">星语要漂 6 小时才能开瓶——好的东西值得等</div>
       <div id="bottleList"></div>
       <button id="bottleClose" class="ghost" style="margin-top:14px">回到星空</button>
+    </div></div>
+    <div id="wishEdit" class="overlay hidden"><div class="card center">
+      <h2>我的心愿单</h2>
+      <div class="sub">Ta 抽中的就是你的心愿——写真实想要的，见面兑现</div>
+      <input class="witem" maxlength="16" placeholder="心愿 1（如：一顿火锅）">
+      <input class="witem" maxlength="16" placeholder="心愿 2">
+      <input class="witem" maxlength="16" placeholder="心愿 3">
+      <input class="witem" maxlength="16" placeholder="心愿 4">
+      <input class="witem" maxlength="16" placeholder="心愿 5">
+      <input class="witem" maxlength="16" placeholder="心愿 6">
+      <div class="err" id="wishErr"></div>
+      <div class="rowbtn"><button id="wishSave" class="big warm">保存心愿单</button>
+        <button id="wishClose" class="ghost" style="margin:0">关闭</button></div>
+    </div></div>
+    <div id="tickets" class="overlay hidden"><div class="card center">
+      <h2>心愿券</h2>
+      <div class="sub">抽中的心愿，记得兑现</div>
+      <div id="tkList"></div>
+      <button id="tkClose" class="ghost" style="margin-top:14px">回到星空</button>
+    </div></div>
+    <div id="drawResult" class="overlay hidden"><div class="card center">
+      <h2>🎁 抽中了心愿</h2>
+      <div class="code" id="drawPrize" style="font-size:26px;letter-spacing:4px;text-indent:4px"></div>
+      <div class="sub" id="drawSub"></div>
+      <div class="rowbtn"><button id="drawAgain" class="warm">再抽一次 · 1 ✦</button>
+        <button id="drawOk" class="ghost" style="margin:0">收下</button></div>
     </div></div>
     <div id="drawBar" class="hidden"><div class="panel">
       <div class="hint" id="drawHint">点亮夜空：点击放置星星（3-8 颗），依次连线</div>
@@ -548,10 +578,14 @@ function renderHeader(){
 }
 function renderMine(){
   $('#balance').textContent=S.sky.starlight;
+  const c=S.sky.collect||{hours:0,amount:0,nextInMin:60,batch:3};
+  const cbtn=$('#collect');
+  if(c.hours>=1){cbtn.disabled=false;cbtn.innerHTML=ico('star')+'收集 '+c.amount+' ✦'}
+  else{cbtn.disabled=true;cbtn.innerHTML=ico('star')+'约 '+c.nextInMin+' 分钟后可收'}
   const r=S.sky.rate;
   const parts=['基础'+(r.base-r.obs-r.cons)];if(r.obs)parts.push('观星台+'+r.obs);if(r.cons)parts.push('星座+'+r.cons);
   if(r.partnerActive)parts.push('Ta同行+30%');
-  $('#rateHint').innerHTML='✦ '+r.total.toFixed(1)+'/小时 · '+parts.join(' · ')+'<br>第 '+S.sky.day+' 天 · 离线封顶 12 小时';
+  $('#rateHint').innerHTML='每小时汇聚 '+c.batch+' ✦ · 最多囤 3 小时 · '+parts.join(' · ');
   const ob=S.sky.observatory;
   $('#obsBtn').innerHTML='<span class="bl">'+ico('tele')+'观星台</span><small>Lv'+ob.level+' → '+(ob.level+1)+' · '+ob.nextCost+' ✦</small>';
   $('#obsBtn').disabled=S.sky.starlight<ob.nextCost;
@@ -577,6 +611,7 @@ function renderTa(){
     ?('你们已互相想念 <b style="color:var(--warm)">'+(p.mine+p.theirs)+'</b> 次 · Ta 想了你 '+p.theirs+' 次<br>送的星会永远挂在 Ta 的夜空上')
     :'等 Ta 加入后，就能戳一戳、送星星了';
   document.querySelectorAll('#giftRow button').forEach(b=>{b.disabled=!S.sky.partner});
+  $('#wishDraw').disabled=!S.sky.partner;
   const un=S.sky.messages.unread;
   $('#bottleBadge').style.display=un?'':'none';$('#bottleBadge').textContent=un+' 可开';
 }
@@ -652,12 +687,14 @@ async function refreshState(){
     renderHeader();renderMine();renderTa();renderChron();}catch(e){}
 }
 setInterval(()=>{
-  if(!S.sky||$('#mine').classList.contains('hidden'))return;
-  if(!stateAt)stateAt=Date.now(); // 防御：创建路径漏设基准时不误显示满额
-  const r=S.sky.rate,wm=S.sky.weather.mult;
-  const pend=Math.min(S.sky.pending+(Date.now()-stateAt)/3600000*r.total*wm,r.total*wm*12);
-  $('#pending').textContent=Math.floor(pend);
-},1000);
+  if(!S.sky||!S.sky.collect||$('#mine').classList.contains('hidden'))return;
+  const c=S.sky.collect;
+  if(c.hours<1){
+    const left=c.nextInMin-Math.floor((Date.now()-stateAt)/60000);
+    if(left<=0)refreshState();
+    else $('#collect').innerHTML=ico('star')+'约 '+left+' 分钟后可收';
+  }
+},10000);
 
 /* ================= SSE ================= */
 function connectSSE(){
@@ -683,6 +720,8 @@ function connectSSE(){
   es.addEventListener('anni',()=>{toast('🗓 Ta 记下了你们的初识之日');refreshState()});
   es.addEventListener('zodiac',e=>{const d=JSON.parse(e.data);
     toast('✦ Ta 点亮了星座 '+ZODIAC[d.zodiac][1]+' '+ZODIAC[d.zodiac][0]);refreshState()});
+  es.addEventListener('prize',e=>{const d=JSON.parse(e.data);
+    toast('🎁 '+(d.name||'Ta')+' 抽中了你的心愿「'+d.prize+'」');vibrate(30);SFX.gift();refreshState()});
 }
 async function replayUnread(){
   try{
@@ -741,10 +780,9 @@ $('#share').addEventListener('click',e=>{if(e.target===$('#share'))$('#share').c
 /* ================= 主交互 ================= */
 $('#collect').onclick=async()=>{
   try{const j=await api('/sky/collect',{});
-    S.sky.starlight=j.starlight;S.sky.pending=0;stateAt=Date.now();
-    renderMine();vibrate(15);
-    if(j.gained>0)SFX.collect();
-    toast(j.gained>0?('✦ +'+j.gained+' 星光'+(j.golden?' · 黄金时刻×2！':'')):'星光还在路上，等等 Ta');
+    S.sky.starlight=j.starlight;stateAt=Date.now();
+    renderMine();vibrate(15);SFX.collect();
+    toast('✦ +'+j.gained+' 星光'+(j.golden?' · 黄金时刻×2！':''));
     for(let i=0;i<4;i++)setTimeout(()=>spawnMeteor(false),i*260);
     refreshState();
   }catch(e){toast(e.message)}};
@@ -861,6 +899,48 @@ $('#bottleBtn').onclick=()=>{
 };
 $('#bottleClose').onclick=()=>$('#bottles').classList.add('hidden');
 $('#bottles').addEventListener('click',e=>{if(e.target===$('#bottles'))$('#bottles').classList.add('hidden')});
+/* ---- 心愿单 / 抽奖 / 心愿券 ---- */
+$('#wishDraw').onclick=async()=>{
+  try{const j=await api('/draw',{});
+    meteorShower(3);vibrate(30);SFX.gift();
+    $('#drawPrize').textContent=j.prize;
+    $('#drawSub').textContent='这是 '+(S.sky.partner?S.sky.partner.name:'Ta')+' 写下的心愿——由你来实现';
+    S.sky.starlight=j.starlight;renderMine();
+    $('#drawResult').classList.remove('hidden');
+  }catch(e){toast(e.message)}};
+$('#drawAgain').onclick=()=>{$('#drawResult').classList.add('hidden');$('#wishDraw').click()};
+$('#drawOk').onclick=()=>$('#drawResult').classList.add('hidden');
+$('#drawResult').addEventListener('click',e=>{if(e.target===$('#drawResult'))$('#drawResult').classList.add('hidden')});
+$('#wishBtn').onclick=async()=>{
+  try{const j=await api('/api/wishlist');
+    document.querySelectorAll('#wishEdit input').forEach((inp,i)=>{inp.value=j.mine[i]||''});
+    $('#wishErr').textContent='';$('#wishEdit').classList.remove('hidden');
+  }catch(e){toast(e.message)}};
+$('#wishClose').onclick=()=>$('#wishEdit').classList.add('hidden');
+$('#wishEdit').addEventListener('click',e=>{if(e.target===$('#wishEdit'))$('#wishEdit').classList.add('hidden')});
+$('#wishSave').onclick=async()=>{
+  const items=[...document.querySelectorAll('#wishEdit input')].map(i=>i.value.trim()).filter(Boolean);
+  try{await api('/wishlist',{items});
+    toast('✦ 心愿单已保存——Ta 抽中就要兑现哦');$('#wishEdit').classList.add('hidden');
+  }catch(e){$('#wishErr').textContent=e.message}};
+$('#ticketBtn').onclick=async()=>{
+  try{const j=await api('/api/tickets');
+    $('#tkList').innerHTML=j.items.length?j.items.map(t=>
+      '<div class="bottle">'+(t.mine
+        ?'<span>你抽中，欠 Ta <b class="txt">「'+esc(t.prize)+'」</b></span><span style="opacity:.5">'+(t.redeemed?'已兑现':'待兑现')+' · '+fmtTime(t.at)+'</span>'
+        :'<span>Ta 抽中你的 <b class="txt">「'+esc(t.prize)+'」</b></span>'+(t.redeemed
+          ?'<span style="opacity:.5">已兑现</span>'
+          :'<button data-rd="'+t.id+'">兑现</button>'))
+      +'</div>').join(''):'<div class="sub" style="text-align:center">还没有心愿券<br>去为 Ta 抽一次吧</div>';
+    $('#tickets').classList.remove('hidden');
+    document.querySelectorAll('#tkList [data-rd]').forEach(b=>b.onclick=async()=>{
+      try{await api('/ticket/redeem',{id:+b.dataset.rd});
+        b.parentElement.innerHTML='<span>Ta 抽中你的心愿</span><span style="opacity:.6">已兑现 ✦</span>';
+        toast('✦ 心愿已兑现');refreshState();
+      }catch(e){toast(e.message)}});
+  }catch(e){toast(e.message)}};
+$('#tkClose').onclick=()=>$('#tickets').classList.add('hidden');
+$('#tickets').addEventListener('click',e=>{if(e.target===$('#tickets'))$('#tickets').classList.add('hidden')});
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   ['mine','ta','chron'].forEach(v=>$('#'+v).classList.toggle('hidden',b.dataset.view!==v));

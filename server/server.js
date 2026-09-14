@@ -5,29 +5,34 @@ const Database = require('better-sqlite3');
 const crypto = require('crypto');
 
 const PORT = 3000;
-const BASE_RATE = 12;        // 基础星光/小时
+const BASE_RATE = 12;        // 产出速率基数（展示与批产计算）
 const OBS_BONUS = 4;         // 观星台每级 +4/h
 const CONS_BONUS = 3;        // 每个星座 +3/h
-const CAP_HOURS = 12;        // 离线封顶
+const BANK_HOURS = 3;        // 星光最多囤 3 小时
 const WELCOME_GIFT = 30;     // 创建见面礼
 const PARTNER_ACTIVE_H = 48; // 伴侣 48h 内活跃 → +30%
-const DAILY_REWARD = 20;     // 双人任务奖励
-const GIFT_COST = [20, 50, 120];   // 小星/亮星/彩星
+const DAILY_REWARD = 4;      // 双人任务奖励
+const GIFT_COST = [4, 10, 24];     // 小星/亮星/彩星
 const GIFT_NAMES = ['小星', '亮星', '彩星'];
-const MSG_COST = 10;         // 星语瓶
+const MSG_COST = 2;          // 星语瓶
 const MSG_DELAY_H = 6;       // 星语瓶 6 小时后才能开启
-const CUSTOM_COST = 20;      // 画一座自定义星座
+const CUSTOM_COST = 4;       // 画一座自定义星座
 const CUSTOM_MAX = 3;        // 最多 3 座
 const CUSTOM_STARS = [3, 8]; // 每座 3-8 颗星
 const CONS_NAMES = ['天琴座', '天鹅座', '仙后座', '猎户座', '天鹰座', '大熊座'];
-const CONS_COST = i => 30 + 20 * i; // 第 i+1 个星座（0 基）
-const OBS_COST = level => 40 * level; // 升到 level+1 级
-const BINARY_LEVEL_GATE = 6; // 观星台+星座总等级 ≥6 或 第12天 解锁双星
+const CONS_COST = i => 6 + 4 * i;  // 第 i+1 个星座（0 基）
+const OBS_COST = level => 8 * level; // 升到 level+1 级
+const BINARY_LEVEL_GATE = 6; // 观星台+星座总等级 ≥6 解锁双星
+const DRAW_COST = 1;         // 抽奖：每颗星光一次
+const WISH_MAX = 6;          // 心愿单最多 6 项
+const DEFAULT_WISH = ['一个拥抱', '一杯奶茶', '看一场电影', '睡前故事', '一次晚饭', '一起看日出'];
 
 const db = new Database(__dirname + '/zsky.db');
 db.pragma('journal_mode = WAL');
 try { db.exec('ALTER TABLE skies ADD COLUMN anniversary TEXT'); } catch (e) { /* 已存在 */ }
 try { db.exec('ALTER TABLE players ADD COLUMN zodiac INTEGER'); } catch (e) { /* 已存在 */ }
+try { db.exec('ALTER TABLE skies ADD COLUMN eco_v2 INTEGER DEFAULT 0'); } catch (e) { /* 已存在 */ }
+db.prepare('UPDATE skies SET starlight=starlight*5, eco_v2=1 WHERE eco_v2=0').run(); // 经济 v2 迁移：存量 ×5 保值
 const ZODIAC = [['白羊座', '♈'], ['金牛座', '♉'], ['双子座', '♊'], ['巨蟹座', '♋'], ['狮子座', '♌'], ['处女座', '♍'], ['天秤座', '♎'], ['天蝎座', '♏'], ['射手座', '♐'], ['摩羯座', '♑'], ['水瓶座', '♒'], ['双鱼座', '♓']];
 db.exec(`
 CREATE TABLE IF NOT EXISTS players (
@@ -103,6 +108,20 @@ CREATE TABLE IF NOT EXISTS custom_cons (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_cc_sky ON custom_cons(sky_id, id);
+CREATE TABLE IF NOT EXISTS wishlists (
+  player_id INTEGER PRIMARY KEY,
+  items TEXT NOT NULL DEFAULT '[]'
+);
+CREATE TABLE IF NOT EXISTS tickets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sky_id INTEGER NOT NULL,
+  prize TEXT NOT NULL,
+  from_player INTEGER NOT NULL,
+  to_player INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  redeemed INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_tk_sky ON tickets(sky_id, id);
 `);
 
 const app = express();
@@ -191,9 +210,9 @@ function rateOf(sky, partner) {
   return { base, obs, cons, partnerActive, total: base * (partnerActive ? 1.3 : 1) };
 }
 function pendingOf(sky, partner) {
-  const hours = Math.min((now() - sky.last_collected_at) / 3.6e6, CAP_HOURS);
-  const r = rateOf(sky, partner);
-  return Math.floor(hours * r.total * weatherOf().mult);
+  const hours = Math.floor(Math.min((now() - sky.last_collected_at) / 3.6e6, BANK_HOURS));
+  const batch = Math.max(1, Math.round(rateOf(sky, partner).total / 5));
+  return { hours, batch, amount: hours * batch * (goldenNow() ? 2 : 1) };
 }
 const binaryUnlocked = sky => sky.obs_level - 1 + sky.const_count >= BINARY_LEVEL_GATE;
 
@@ -264,11 +283,13 @@ function skyOf(p) {
   const customCons = db.prepare('SELECT id,name,stars,created_at FROM custom_cons WHERE sky_id=? ORDER BY id').all(sky.id)
     .map(c => ({ id: c.id, name: c.name, stars: JSON.parse(c.stars), at: c.created_at }));
   const chrCount = db.prepare('SELECT COUNT(*) c FROM chronicle WHERE sky_id=?').get(sky.id).c;
+  const cInfo = pendingOf(sky, partner);
+  const nextInMin = Math.max(0, Math.ceil((sky.last_collected_at + 3600e3 - now()) / 60000));
   return {
     id: sky.id,
     inviteCode: partner ? null : sky.invite_code,
     starlight: sky.starlight,
-    pending: pendingOf(sky, partner),
+    collect: { hours: cInfo.hours, batch: cInfo.batch, amount: cInfo.amount, nextInMin },
     rate: r,
     weather: weatherOf(),
     golden: goldenNow(),
@@ -375,11 +396,14 @@ app.post('/api/sky/collect', (req, res) => {
   const p = requirePlayer(req, res); if (!p) return;
   const sky = p.sky_id && db.prepare('SELECT * FROM skies WHERE id=?').get(p.sky_id);
   if (!sky) return res.status(400).json({ error: '还没有星空' });
-  const golden = goldenNow();
-  const gained = Math.floor(pendingOf(sky, partnerOf(p)) * (golden ? 2 : 1));
-  db.prepare('UPDATE skies SET starlight=starlight+?, last_collected_at=? WHERE id=?').run(gained, now(), sky.id);
-  if (gained > 0) markDaily(p.id, 'collected');
-  res.json({ gained, golden, starlight: sky.starlight + gained });
+  const c = pendingOf(sky, partnerOf(p));
+  if (c.hours < 1) {
+    const next = Math.max(1, Math.ceil((sky.last_collected_at + 3600e3 - now()) / 60000));
+    return res.status(400).json({ error: '下一批星光约 ' + next + ' 分钟后汇聚完成' });
+  }
+  db.prepare('UPDATE skies SET starlight=starlight+?, last_collected_at=? WHERE id=?').run(c.amount, now(), sky.id);
+  markDaily(p.id, 'collected');
+  res.json({ gained: c.amount, golden: goldenNow(), starlight: sky.starlight + c.amount });
 });
 
 // ---- 成长：观星台 / 星座 / 双星
@@ -468,6 +492,64 @@ app.post('/api/sky/anniversary', (req, res) => {
   const tp = partnerOf(p);
   if (tp) sendTo(tp.id, 'anni', { date: d });
   res.json({ ok: true, date: d });
+});
+
+// ---- 心愿单与抽奖：礼物由对方设定
+app.get('/api/wishlist', (req, res) => {
+  const p = requirePlayer(req, res); if (!p) return;
+  const mine = db.prepare('SELECT items FROM wishlists WHERE player_id=?').get(p.id);
+  const t = partnerOf(p);
+  const theirs = t ? db.prepare('SELECT items FROM wishlists WHERE player_id=?').get(t.id) : null;
+  res.json({
+    mine: mine ? JSON.parse(mine.items) : [],
+    theirs: theirs ? JSON.parse(theirs.items) : null,
+    defaults: DEFAULT_WISH,
+  });
+});
+app.post('/api/wishlist', (req, res) => {
+  const p = requirePlayer(req, res); if (!p) return;
+  const items = (Array.isArray(req.body.items) ? req.body.items : [])
+    .slice(0, WISH_MAX).map(s => String(s || '').trim().slice(0, 16)).filter(Boolean);
+  const json = JSON.stringify(items);
+  db.prepare('INSERT INTO wishlists(player_id,items) VALUES(?,?) ON CONFLICT(player_id) DO UPDATE SET items=?')
+    .run(p.id, json, json);
+  res.json({ ok: true, items });
+});
+app.post('/api/draw', (req, res) => {
+  const p = requirePlayer(req, res); if (!p) return;
+  const sky = p.sky_id && db.prepare('SELECT * FROM skies WHERE id=?').get(p.sky_id);
+  if (!sky) return res.status(400).json({ error: '还没有星空' });
+  const t = partnerOf(p);
+  if (!t) return res.status(400).json({ error: '等 Ta 加入后就能为 Ta 抽心愿' });
+  if (sky.starlight < DRAW_COST) return res.status(400).json({ error: '星光不足，先去收集' });
+  const wl = db.prepare('SELECT items FROM wishlists WHERE player_id=?').get(t.id);
+  const parsed = wl ? JSON.parse(wl.items) : [];
+  const pool = parsed.length ? parsed : DEFAULT_WISH;
+  const prize = pool[Math.floor(Math.random() * pool.length)];
+  db.prepare('UPDATE skies SET starlight=starlight-? WHERE id=?').run(DRAW_COST, sky.id);
+  db.prepare('INSERT INTO tickets(sky_id,prize,from_player,to_player,created_at) VALUES(?,?,?,?,?)')
+    .run(sky.id, prize, p.id, t.id, now());
+  if (!db.prepare('SELECT 1 FROM chronicle WHERE sky_id=? AND kind=?').get(sky.id, 'wish:' + prize)) {
+    chron(sky.id, 'wish:' + prize, `🎁 心愿「${prize}」第一次被抽中，记得兑现`);
+  }
+  markDaily(p.id, 'poked'); // 抽心愿也算今日互动
+  res.json({ ok: true, prize, starlight: sky.starlight - DRAW_COST });
+  sendTo(t.id, 'prize', { prize, name: p.name });
+});
+app.get('/api/tickets', (req, res) => {
+  const p = requirePlayer(req, res); if (!p) return;
+  if (!p.sky_id) return res.json({ items: [] });
+  const items = db.prepare('SELECT id,prize,from_player,to_player,created_at,redeemed FROM tickets WHERE sky_id=? ORDER BY id DESC LIMIT 50').all(p.sky_id)
+    .map(x => ({ id: x.id, prize: x.prize, mine: x.from_player === p.id, at: x.created_at, redeemed: !!x.redeemed }));
+  res.json({ items });
+});
+app.post('/api/ticket/redeem', (req, res) => {
+  const p = requirePlayer(req, res); if (!p) return;
+  const t = db.prepare('SELECT * FROM tickets WHERE id=?').get(req.body.id);
+  if (!t || t.sky_id !== p.sky_id) return res.status(404).json({ error: '心愿券不存在' });
+  if (t.to_player !== p.id) return res.status(403).json({ error: '只有心愿主人能兑现' });
+  if (!t.redeemed) db.prepare('UPDATE tickets SET redeemed=1 WHERE id=?').run(t.id);
+  res.json({ ok: true });
 });
 
 // ---- 摘星送 Ta
