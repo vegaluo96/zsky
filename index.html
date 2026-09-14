@@ -287,6 +287,7 @@ async function api(path,body){
 /* ================= 星空引擎 ================= */
 const cv=$('#sky'),ctx=cv.getContext('2d');
 const SPEC=['#9db4ff','#aabfff','#cad7ff','#f8f7ff','#fff4ea','#ffd2a1','#ffcc6f'];
+const ZODIAC=[['白羊座','♈'],['金牛座','♉'],['双子座','♊'],['巨蟹座','♋'],['狮子座','♌'],['处女座','♍'],['天秤座','♎'],['天蝎座','♏'],['射手座','♐'],['摩羯座','♑'],['水瓶座','♒'],['双鱼座','♓']];
 const starColor=()=>SPEC[Math.min(6,Math.floor(Math.pow(Math.random(),2)*7))];
 let W,H,DPR,farC,midC,nearStars=[],meteors=[],giftStars=[],drops=[],chronItems=[];
 /* 星座图形：归一化点位 + 连线（绘制在各自区域） */
@@ -489,7 +490,7 @@ function renderHeader(){
   $('#golden').classList.toggle('hidden',!(S.sky&&S.sky.golden));
   const p=$('#partner');
   if(S.sky&&S.sky.partner){p.classList.remove('hidden');
-    const zg=S.sky.partner.zodiac!=null&&window.ZODIAC?window.ZODIAC[S.sky.partner.zodiac][1]+' ':'';
+    const zg=S.sky.partner.zodiac!=null?ZODIAC[S.sky.partner.zodiac][1]+' ':'';
     p.innerHTML=S.sky.partner.online
       ?'<i class="dot"></i>'+zg+esc(S.sky.partner.name)+' 正在望着星空'
       :zg+esc(S.sky.partner.name)+' · '+(S.sky.partner.lastActive&&Date.now()-S.sky.partner.lastActive>60000
@@ -539,8 +540,7 @@ function renderChron(){
     :'你是 <span class="biname">'+esc(me)+'</span> · 等 Ta 加入')+anni;
   $('#anniInput').value=S.sky.anniversary||'';
   /* 星座 */
-  const ZD=[['白羊座','♈'],['金牛座','♉'],['双子座','♊'],['巨蟹座','♋'],['狮子座','♌'],['处女座','♍'],['天秤座','♎'],['天蝎座','♏'],['射手座','♐'],['摩羯座','♑'],['水瓶座','♒'],['双鱼座','♓']];
-  window.ZODIAC=ZD;
+  const ZD=ZODIAC;
   const sel=$('#myZodiac');
   if(!sel.options.length)sel.innerHTML='<option value="">点亮你的星座</option>'+ZD.map((z,i)=>'<option value="'+i+'">'+z[1]+' '+z[0]+'</option>').join('');
   const mz=S.player&&S.player.zodiac!=null?S.player.zodiac:null;
@@ -615,7 +615,7 @@ function connectSSE(){
   es.addEventListener('cc',e=>{toast('✏️ Ta 在你们夜空画了「'+JSON.parse(e.data).name+'」');meteorShower(4);SFX.cons();refreshState()});
   es.addEventListener('anni',()=>{toast('🗓 Ta 记下了你们的初识之日');refreshState()});
   es.addEventListener('zodiac',e=>{const d=JSON.parse(e.data);
-    toast('✦ Ta 点亮了星座 '+(window.ZODIAC?window.ZODIAC[d.zodiac][1]+' '+window.ZODIAC[d.zodiac][0]:''));refreshState()});
+    toast('✦ Ta 点亮了星座 '+ZODIAC[d.zodiac][1]+' '+ZODIAC[d.zodiac][0]);refreshState()});
 }
 async function replayUnread(){
   try{
