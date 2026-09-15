@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<title>AI 模型排名 · zsky</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+::-webkit-scrollbar{display:none}
+:root{--bg:#0a0a0a;--card:#141414;--card2:#1c1c1c;--border:#242424;--ink:#e8e8e8;--dim:#888;--faint:#555;--green:#00c805;--red:#ff5000;--r:12px;color-scheme:dark}
+html{scroll-behavior:smooth;overflow-x:hidden}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",sans-serif;max-width:680px;margin:0 auto;font-size:15px;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+
+/* 导航 */
+#nav{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border)}
+#nav .brand{font-size:20px;font-weight:800;color:var(--green);flex:1;text-align:center;letter-spacing:-.5px}
+
+/* Hero */
+#hero{background:var(--card);border-radius:var(--r);padding:20px;margin:16px;text-align:center}
+#hero .rank-label{font-size:11px;color:var(--dim);font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+#hero .model-name{font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.2}
+#hero .provider{font-size:13px;color:var(--dim);margin-top:2px}
+#hero .stats{display:flex;gap:12px;margin-top:14px}
+#hero .stats .s{flex:1}
+#hero .stats .s .v{font-size:20px;font-weight:700;display:block;font-variant-numeric:tabular-nums}
+#hero .stats .s .v.up{color:var(--green)}
+#hero .stats .s .l{font-size:10px;color:var(--faint);display:block;margin-top:2px;font-weight:600}
+
+/* Tab */
+#tabs{display:flex;gap:4px;padding:0 16px;margin:12px 0;overflow-x:auto;scrollbar-width:none;white-space:nowrap}
+#tabs button{font:inherit;font-size:14px;font-weight:600;color:var(--dim);background:none;border:none;padding:8px 16px;cursor:pointer;border-radius:20px}
+#tabs button.on{color:var(--bg);background:var(--ink)}
+
+/* 卡片 */
+.card{background:var(--card);border-radius:var(--r);padding:16px;margin:0 16px 12px}
+.card h3{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.card h3 span{font-size:11px;color:var(--faint);font-weight:400}
+
+/* 表格 */
+.tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.tbl th{font-size:10px;color:var(--faint);font-weight:600;text-align:right;padding:4px 6px;border-bottom:1px solid var(--border)}
+.tbl th:first-child{text-align:left}
+.tbl td{font-size:14px;padding:10px 6px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .nm b{font-size:14px;font-weight:600;display:block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl .nm span{font-size:10px;color:var(--faint);display:block}
+.tbl .val{font-weight:700;font-size:15px}
+.chg{font-weight:600;font-size:12px}
+.chg.up{color:var(--green)}.chg.dn{color:var(--red)}
+.cn-badge{display:inline-block;font-size:9px;font-weight:700;color:#d4a017;background:rgba(255,170,0,.1);border-radius:3px;padding:1px 4px;margin-left:4px;vertical-align:1px}
+
+/* 市场份额条 */
+.share-row{display:flex;align-items:center;gap:8px;margin:8px 0}
+.share-row .name{width:80px;font-size:12px;color:var(--dim);font-weight:600;text-align:right;flex-shrink:0}
+.share-row .bar{flex:1;height:16px;background:var(--card2);border-radius:4px;overflow:hidden}
+.share-row .bar i{display:block;height:100%;border-radius:4px}
+.share-row .pct{width:48px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0}
+
+/* 任务分类 */
+.task-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.task-item:last-child{border-bottom:none}
+.task-item .task-header{display:flex;justify-content:space-between;align-items:center}
+.task-item .task-name{font-size:14px;font-weight:600}
+.task-item .task-share{font-size:14px;font-weight:700;color:var(--dim)}
+.task-item .task-models{font-size:11px;color:var(--faint);margin-top:4px}
+.task-item .bar{height:4px;background:var(--card2);border-radius:2px;margin-top:6px;overflow:hidden}
+.task-item .bar i{display:block;height:100%;background:var(--green);border-radius:2px}
+
+/* 底部 Tab */
+#tabbar{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--border);z-index:99;padding:8px 0 calc(8px + env(safe-area-inset-bottom));max-width:680px;margin:0 auto}
+#tabbar a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none;color:var(--faint);font-size:10px;font-weight:600}
+#tabbar a svg{width:22px;height:22px}
+#tabbar a.on{color:var(--green)}
+
+/* 时间范围 */
+.range-btns{display:flex;gap:4px;background:var(--card2);border-radius:8px;padding:2px;margin-bottom:12px}
+.range-btns button{flex:1;font:inherit;font-size:12px;font-weight:600;color:var(--dim);background:none;border:none;border-radius:6px;padding:6px 0;cursor:pointer}
+.range-btns button.on{background:var(--card);color:var(--ink)}
+
+footer{text-align:center;padding:16px;font-size:10px;color:var(--faint)}
+footer a{color:var(--dim)}
+</style>
+</head>
+<body>
+<nav id="nav"><span class="brand">AI 模型排名</span></nav>
+
+<div id="hero"></div>
+<div id="tabs">
+  <button class="on" onclick="switchTab('rank')">排行</button>
+  <button onclick="switchTab('bench')">基准</button>
+  <button onclick="switchTab('task')">任务</button>
+  <button onclick="switchTab('app')">应用</button>
+</div>
+<div id="content"></div>
+<footer>数据源 <a href="https://openrouter.ai/rankings" target="_blank">OpenRouter</a> · CC BY 4.0 · 每小时更新<br>排名基于真实使用量（Token 处理量），不代表模型质量</footer>
+<div id="tabbar">
+  <a href="javascript:void(0)" onclick="switchTab('rank')" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-6M22 20H2"/></svg>排行</a>
+  <a href="javascript:void(0)" onclick="switchTab('bench')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>基准</a>
+  <a href="javascript:void(0)" onclick="switchTab('task')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h7"/></svg>任务</a>
+  <a href="javascript:void(0)" onclick="switchTab('app')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>应用</a>
+</div>
+
+<script>
+let D=null;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+async function load(){
+  try{
+    const r=await fetch('data/or.json?_='+Date.now(),{cache:'no-store'});
+    D=await r.json();
+    renderHero();
+    switchTab('rank');
+  }catch(e){$('#content').innerHTML='<p style="padding:40px;color:var(--faint);text-align:center">加载失败</p>'}
+}
+
+function renderHero(){
+  const top=D.rankings?.[0];
+  if(!top)return;
+  const trendClass=top.trend>=0?'up':'dn';
+  const trendStr=top.trend>=999?'新':(top.trend>=0?'+':'')+top.trend+'%';
+  $('#hero').innerHTML=`
+    <div class="rank-label">本周 Token 用量第一</div>
+    <div class="model-name">${esc(top.name)}</div>
+    <div class="provider">by ${esc(top.providerCN)}${top.isCN?'<span class="cn-badge">国产</span>':''}</div>
+    <div class="stats">
+      <div class="s"><span class="v">${top.tokensStr}</span><span class="l">周 Token</span></div>
+      <div class="s"><span class="v ${trendClass}">${trendStr}</span><span class="l">周环比</span></div>
+      <div class="s"><span class="v">$${top.promptPrice!=null?top.promptPrice.toFixed(2):'—'}</span><span class="l">$/M输入</span></div>
+    </div>`;
+}
+
+let TAB='rank';
+function switchTab(t){
+  TAB=t;
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.textContent===({rank:'排行',bench:'基准',task:'任务',app:'应用'})[t]));
+  document.querySelectorAll('#tabbar a').forEach(a=>a.classList.toggle('on',a.textContent.includes({rank:'排行',bench:'基准',task:'任务',app:'应用'})[t]));
+  const el=$('#content');
+  if(t==='rank')el.innerHTML=renderRank();
+  else if(t==='bench')el.innerHTML=renderBench();
+  else if(t==='task')el.innerHTML=renderTask();
+  else if(t==='app')el.innerHTML=renderApp();
+  window.scrollTo(0,0);
+}
+
+function renderRank(){
+  const rows=D.rankings||[];
+  const share=D.marketShare||[];
+  const shareColors=['#00c805','#4a90d9','#d4a017','#e05555','#9b59b6','#1abc9c','#e67e22','#34495e','#95a5a6','#e91e63'];
+  let html=`
+  <div class="card"><h3>Token 用量排行<span>近 7 天</span></h3>
+    <table class="tbl"><thead><tr><th style="width:8%">#</th><th style="width:44%">模型</th><th style="width:22%">Token</th><th style="width:14%">环比</th><th style="width:12%"></th></tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const trendStr=r.isNew?'<span style="color:var(--green);font-size:10px;font-weight:700">NEW</span>':`<span class="chg ${r.trend>=0?'up':'dn'}">${r.trend>=0?'+':''}${r.trend}%</span>`;
+    html+=`<tr><td style="color:var(--faint)">${i+1}</td>
+      <td class="nm"><b>${esc(r.name)}${r.isCN?'<span class="cn-badge">CN</span>':''}</b><span>${esc(r.providerCN)}</span></td>
+      <td><span class="val">${r.tokensStr}</span></td>
+      <td>${trendStr}</td>
+      <td style="font-size:11px;color:var(--dim)">${r.promptPrice!=null?'$'+r.promptPrice.toFixed(2):''}</td></tr>`;
+  });
+  html+='</tbody></table></div>';
+
+  // 市场份额
+  html+=`<div class="card"><h3>厂商份额<span>按 Token 用量</span></h3>`;
+  share.slice(0,10).forEach((s,i)=>{
+    const color=shareColors[i%shareColors.length];
+    html+=`<div class="share-row">
+      <span class="name">${esc(s.name)}</span>
+      <div class="bar"><i style="width:${Math.max(2,s.share*100)}%;background:${color}"></i></div>
+      <span class="pct" style="color:${color}">${(s.share*100).toFixed(1)}%</span>
+    </div>`;
+  });
+  html+='</div>';
+  return html;
+}
+
+function renderBench(){
+  const rows=D.benchmarks||[];
+  const cols=[
+    {key:'intelligence',label:'智能指数',fmt:v=>v.toFixed(1)},
+    {key:'coding',label:'编程能力',fmt:v=>v?v.toFixed(1):'—'},
+    {key:'agentic',label:'Agent 能力',fmt:v=>v?v.toFixed(1):'—'},
+  ];
+  let html='';
+  cols.forEach(col=>{
+    const sorted=rows.filter(r=>r[col.key]!=null).sort((a,b)=>b[col.key]-a[col.key]).slice(0,15);
+    html+=`<div class="card"><h3>${col.label}<span>Artificial Analysis</span></h3>
+      <table class="tbl"><thead><tr><th style="width:8%">#</th><th style="width:52%">模型</th><th style="width:20%">分数</th><th style="width:20%">$/M</th></tr></thead><tbody>`;
+    sorted.forEach((r,i)=>{
+      html+=`<tr><td style="color:var(--faint)">${i+1}</td>
+        <td class="nm"><b>${esc(r.name)}${r.isCN?'<span class="cn-badge">CN</span>':''}</b><span>${esc(r.providerCN)}</span></td>
+        <td><span class="val">${col.fmt(r[col.key])}</span></td>
+        <td style="font-size:11px;color:var(--dim)">${r.promptPrice!=null?'$'+r.promptPrice.toFixed(2):'—'}</td></tr>`;
+    });
+    html+='</tbody></table></div>';
+  });
+  return html;
+}
+
+function renderTask(){
+  const tasks=D.tasks||[];
+  let html=`<div class="card"><h3>任务分布<span>近 7 天 · 使用量占比</span></h3>`;
+  tasks.slice(0,15).forEach(t=>{
+    html+=`<div class="task-item">
+      <div class="task-header">
+        <span class="task-name">${esc(t.name)}</span>
+        <span class="task-share">${(t.usageShare*100).toFixed(1)}%</span>
+      </div>
+      <div class="bar"><i style="width:${Math.max(2,t.usageShare*100)}%"></i></div>
+      ${t.topModels.length?`<div class="task-models">Top: ${t.topModels.map(m=>esc(m.name)).join(' · ')}</div>`:''}
+    </div>`;
+  });
+  html+='</div>';
+  return html;
+}
+
+function renderApp(){
+  const apps=D.apps||[];
+  let html=`<div class="card"><h3>应用排行<span>按 Token 用量</span></h3>
+    <table class="tbl"><thead><tr><th style="width:8%">#</th><th style="width:48%">应用</th><th style="width:24%">Token</th><th style="width:20%">请求数</th></tr></thead><tbody>`;
+  apps.forEach((a,i)=>{
+    const reqStr=a.requests>=1e6?(a.requests/1e6).toFixed(1)+'M':a.requests>=1e3?(a.requests/1e3).toFixed(0)+'K':a.requests;
+    html+=`<tr><td style="color:var(--faint)">${a.rank||i+1}</td>
+      <td class="nm"><b>${esc(a.name)}</b></td>
+      <td><span class="val">${a.tokensStr}</span></td>
+      <td style="font-size:12px;color:var(--dim)">${reqStr}</td></tr>`;
+  });
+  html+='</tbody></table></div>';
+  return html;
+}
+
+load();
+setInterval(load,10*60*1000);
+</script>
+</body>
+</html>
